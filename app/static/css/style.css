@@ -75,11 +75,14 @@ input, select, button, textarea { font: inherit; color: inherit; }
   width: min(1080px, 100%);
   margin: 0 auto;
   padding: var(--pad) var(--pad) 56px;
+  padding-left: calc(var(--pad) + env(safe-area-inset-left, 0px));
+  padding-right: calc(var(--pad) + env(safe-area-inset-right, 0px));
   display: flex;
   flex-direction: column;
   gap: 22px;
 }
 .kidview .page { padding-bottom: 120px; }
+.kidview .page { padding-bottom: calc(120px + env(safe-area-inset-bottom, 0px)); }
 
 .section { display: flex; flex-direction: column; gap: 12px; }
 
@@ -101,6 +104,8 @@ input, select, button, textarea { font: inherit; color: inherit; }
 /* --- top bar (grown-ups) ------------------------------------------------ */
 .topbar {
   position: sticky; top: 0; z-index: 40;
+  padding-top: 0;
+  padding-top: env(safe-area-inset-top, 0px);   /* clear the PWA status bar */
   background: rgba(255, 255, 255, .82);
   backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--line);
@@ -199,6 +204,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
 
 /* --- gate screens (who / login / setup) --------------------------------- */
 .gate .page { min-height: 100dvh; justify-content: center; }
+.gate .page { padding-top: calc(var(--pad) + env(safe-area-inset-top, 0px)); }
 .gate__wrap {
   width: min(760px, 100%);
   margin: 0 auto;
@@ -282,6 +288,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
   background: linear-gradient(135deg, var(--kid), color-mix(in srgb, var(--kid) 55%, #ffffff));
   color: #fff;
   padding: 16px var(--pad) 26px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
   border-radius: 0 0 var(--r-xl) var(--r-xl);
   box-shadow: var(--shadow);
   position: sticky; top: 0; z-index: 30;
@@ -640,6 +647,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
 /* --- bottom tab bar (kids) ---------------------------------------------- */
 .tabbar {
   position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   z-index: 50;
   width: min(520px, calc(100% - 24px));
   display: grid; grid-template-columns: repeat(4, 1fr);
@@ -687,6 +695,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
 
 .toast-pop {
   position: fixed; left: 50%; top: 22px; transform: translateX(-50%);
+  top: calc(22px + env(safe-area-inset-top, 0px));
   z-index: 90;
   max-width: min(440px, calc(100% - 28px));
   padding: 15px 24px;
@@ -700,7 +709,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
 }
 .toast-pop.is-going { animation: pop-out .35s ease forwards; }
 /* clear the kid's sticky header so the toast never covers their name */
-.kidview .toast-pop { top: 118px; }
+.kidview .toast-pop { top: calc(118px + env(safe-area-inset-top, 0px)); }
 
 #confetti {
   position: fixed; inset: 0;

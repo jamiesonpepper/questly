@@ -1,4 +1,7 @@
-from flask import Blueprint, Response, g, jsonify, redirect, render_template, url_for
+import os
+
+from flask import (Blueprint, current_app, g, jsonify, redirect,
+                   render_template, send_from_directory, url_for)
 
 from ..db import get_db
 from ..models import has_any_parent, list_kids
@@ -27,12 +30,13 @@ def who():
 
 @bp.get("/favicon.ico")
 def favicon():
-    """Browsers ask for this regardless of the <link> tag; answer it so the
+    """Browsers ask for this regardless of the <link> tags; answer it so the
     logs stay clean."""
-    svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
-           '<text y=".9em" font-size="90">\u2b50</text></svg>')
-    return Response(svg, mimetype="image/svg+xml",
-                    headers={"Cache-Control": "public, max-age=86400"})
+    return send_from_directory(
+        os.path.join(current_app.root_path, "static", "icons"),
+        "favicon-32.png",
+        mimetype="image/png",
+    )
 
 
 @bp.get("/healthz")
