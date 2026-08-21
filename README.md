@@ -271,6 +271,13 @@ pip install pillow && python tools/make_icons.py
 
 ---
 
+## Changelog
+
+Notable changes are recorded in [CHANGELOG.md](CHANGELOG.md), and each release
+is tagged on the [releases page](https://github.com/mahansford/questly/releases).
+
+---
+
 ## Licence
 
 [GNU Affero General Public License v3.0](LICENSE) — free and open source.
