@@ -1,26 +1,64 @@
-# ⭐ Questly
+<p align="center">
+  <img src="app/static/icons/icon-192.png" alt="" width="112" height="112">
+</p>
 
-A family points-and-rewards app. Grown-ups award points for quests and good
-behaviour; kids spend those points in a shop of rewards you control.
+<h1 align="center">Questly</h1>
 
-Built with Flask + MongoDB, runs in Docker.
+<p align="center">
+  <strong>A family points-and-rewards app.</strong><br>
+  Grown-ups award points for quests and good behaviour.<br>
+  Kids spend those points in a shop of rewards you control.
+</p>
+
+<p align="center">
+  <img alt="Flask" src="https://img.shields.io/badge/Flask-3.1-000?logo=flask&logoColor=white">
+  <img alt="MongoDB" src="https://img.shields.io/badge/MongoDB-5%2B-13aa52?logo=mongodb&logoColor=white">
+  <img alt="Docker" src="https://img.shields.io/badge/Docker-compose-2496ed?logo=docker&logoColor=white">
+</p>
 
 ---
 
+Self-hosted, no accounts with anyone else, no ads, no subscriptions. It runs on
+a spare machine or a NAS and is used from any phone, tablet or laptop on the
+same network. The layout is mobile-first and installs to a home screen as a
+web app.
+
+- **Two sides.** Grown-ups log in with an email and password. Kids tap their
+  avatar and type a 4–6 digit PIN — or no PIN at all for the youngest.
+- **Quests** — recurring jobs worth points. A kid taps **Done!**, a grown-up
+  approves, the points land.
+- **A shop** you stock yourself, with prices, icons and optional limited stock.
+- **A full ledger.** Every point in or out is recorded with a running balance.
+
+---
+
+## Requirements
+
+Docker Engine with the Compose plugin (`docker compose`). Nothing else — Python
+and MongoDB both run inside containers. Works on x86-64 and ARM64.
+
 ## Quick start
 
-Already done on this machine — the stack is built and running, and `.env`
-has a freshly generated `SECRET_KEY`. Just open **http://localhost:37000**.
-
-Starting from scratch elsewhere:
+```bash
+git clone https://github.com/mahansford/questly.git && cd questly
+```
 
 ```bash
-cp .env.example .env          # then set SECRET_KEY
+cp .env.example .env
+```
+
+Set a real `SECRET_KEY` in `.env`:
+
+```bash
+sed -i.bak "s|^SECRET_KEY=.*|SECRET_KEY=$(openssl rand -hex 32)|" .env && rm -f .env.bak
+```
+
+```bash
 docker compose up --build -d
 ```
 
-The first visit asks you to create a grown-up account, then walks you to the
-Family page where you add your kids.
+Open **http://localhost:37000**. The first visit asks you to create a grown-up
+account, then walks you to the Family page to add your kids.
 
 ### Optional: start with example content
 
@@ -35,95 +73,96 @@ docker compose exec web flask --app wsgi:app seed-demo
 
 ## How it works
 
-**Grown-ups** log in with an email and password. **Kids** tap their avatar on
-the front page and type a 4–6 digit PIN — or no PIN at all for younger kids.
-
 | Thing | What happens |
 | --- | --- |
-| **Award points** | Quick `+1 / +5 / +10 / +25` buttons on each kid's card, or any custom amount, with an optional reason. Points can be taken away too. |
-| **Quests** | Recurring jobs (daily, weekly or one-off) worth a set number of points. A kid taps **Done!**, you approve, the points land. |
-| **Shop** | Rewards you create, each with a point cost, an emoji and optional limited stock. |
+| **Award points** | Quick `+10 / +25 / +50 / +100` buttons on each kid's card, or any custom amount, with an optional reason. Points can be taken away too. |
+| **Quests** | Recurring jobs (daily, weekly or one-off) worth a set number of points, assignable to specific kids or everyone. A kid taps **Done!**, you approve, the points land. |
+| **Shop** | Rewards you create, each with a point cost, an icon, a description and optional limited stock. |
 | **Buying** | Points are deducted the moment a kid buys, and the reward queues up for you to hand over. Turning a request down refunds the points automatically. |
-| **Approvals** | One page listing every quest and purchase waiting on you. The nav shows a count badge. |
-| **Your account** | Each grown-up can change their own name, login email, icon and password. Reach it by tapping your name in the top bar. |
-| **Locked out?** | Either grown-up can set a new password for the other, confirmed with their own password. There's no email recovery, so this is the way back in. |
+| **Approvals** | One page listing every quest and purchase waiting on you, with a count badge in the nav. |
+| **Accounts** | Each grown-up can change their own name, login email, icon and password. |
+| **Locked out?** | Either grown-up can set a new password for the other, confirmed with their own password. There is no email recovery, so this is the way back in. |
 
-Every point movement is written to a ledger, so each kid gets a full history
-with a running balance.
-
-### Notes on the rules
+### The rules it enforces
 
 - A kid can never go below zero points, and can't overspend by double-tapping
   Buy — the deduction is a conditional atomic update.
-- A daily quest can be claimed once per calendar day, a weekly one once per ISO
-  week, both in the timezone set by `TZ`.
+- Two kids racing for the last limited-stock item can't both win it, for the
+  same reason.
+- A daily quest can be claimed once per calendar day and a weekly one once per
+  ISO week, both in the timezone set by `TZ`.
 - Rejecting a quest claim lets the kid try again in the same period.
+- Every mutation is CSRF-protected, and kids can't reach grown-up pages.
 
 ---
 
 ## Configuration
 
-Everything is set in `.env` (read by Docker Compose):
+Everything is set in `.env`, which Docker Compose reads:
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PORT` | `37000` | Host port the app is served on |
-| `SECRET_KEY` | — | **Change this.** Signs session cookies |
+| `SECRET_KEY` | — | **Set this.** Signs session cookies |
 | `MONGO_DB` | `questly` | Database name |
+| `MONGO_URI` | bundled container | Only needed for an external MongoDB — see below |
 | `TZ` | `Europe/London` | Drives dates and daily/weekly quest resets |
 
-Generate a key with:
-
-```bash
-python3 -c "import secrets; print(secrets.token_hex(32))"
-```
+`.env` is gitignored, so secrets stay out of version control.
 
 ---
 
 ## Using a MongoDB you already run
 
 The compose file ships a MongoDB container for convenience, but the app is
-happy talking to any MongoDB 5+ instance. To use your own — a container on a
-NAS, say — set `MONGO_URI` in `.env` and start only the web service:
+happy talking to any MongoDB 5+ instance. Set `MONGO_URI` in `.env` and start
+only the web service:
 
 ```bash
 docker compose up -d --no-deps web
 ```
 
 `--no-deps` is what stops Compose from also starting the bundled `mongo`
-service. Without it you'd get two databases running and only one in use.
+service. Without it you get two databases running and only one in use.
 
-Your MongoDB has to be reachable from inside the web container, which means
-one of:
+MongoDB has to be reachable from *inside* the web container, which means one of:
 
 - **Same docker network** — put both containers on the same *user-defined*
   network and address it by container name (`mongodb://my-mongodb:27017/`).
-  Docker's default `bridge` network does **not** resolve container names, so a
-  custom network is required for this to work.
-- **Via the host** — publish MongoDB's port on the host and point at the
-  host's LAN IP (`mongodb://192.168.1.50:27017/`).
+  Docker's default `bridge` network does not resolve container names, so a
+  custom network is required.
+- **Via the host** — publish MongoDB's port and point at the host's LAN IP
+  (`mongodb://192.168.1.50:27017/`).
 
-If your MongoDB has authentication turned on, include the credentials and the
-auth database: `mongodb://user:pass@host:27017/?authSource=admin`. Since `.env`
-is gitignored, those credentials stay off GitHub.
+With authentication enabled, include the credentials and the auth database:
+`mongodb://user:pass@host:27017/?authSource=admin`.
 
 The app creates its own collections and indexes on first use, so an empty
 database is all it needs. It only ever touches the database named by
-`MONGO_DB`, so sharing a MongoDB instance with other apps is fine.
+`MONGO_DB`, so sharing an instance with other apps is fine.
+
+> **Running on a NAS?** Docker *named volumes* often live inside a fixed-size
+> virtual disk that your normal share backups don't cover. Either bind-mount
+> the database to real storage or point `MONGO_URI` at a MongoDB container you
+> manage yourself.
 
 ---
 
-## Running it on your home network
+## On your home network
 
-By default the app is reachable from other devices on your LAN at
-**http://10.11.10.33:37000** — handy for kids on tablets or phones. The layout is
-mobile-first, so it works well saved to a home screen.
+Once it's running, the app is reachable from other devices at
+`http://<server-ip>:37000` — handy for kids on tablets and phones. Find the
+address with `hostname -I` (Linux) or `ipconfig getifaddr en0` (macOS). A DHCP
+reservation in your router keeps it from changing.
 
-(That address is this Mac's current IP; it can change when your router hands
-out a new lease. A DHCP reservation in your router settings pins it.)
+### Install it to a home screen
 
-It speaks plain HTTP and is meant for a trusted home network. Don't expose it
-directly to the internet without putting HTTPS in front of it.
+Open that address on the device and choose **Add to Home Screen** (Share menu
+on iOS, browser menu on Android). It launches full-screen with its own icon and
+no browser chrome, which is how it's meant to be used.
+
+> Questly speaks plain HTTP and assumes a trusted home network. Don't expose it
+> to the internet without putting HTTPS and, ideally, a VPN in front of it.
 
 ---
 
@@ -136,7 +175,7 @@ docker compose logs -f web    # tail the app logs
 docker compose up --build -d  # rebuild after changing the code
 ```
 
-Add another grown-up from the command line:
+Add a grown-up from the command line — useful if everyone is locked out:
 
 ```bash
 docker compose exec web flask --app wsgi:app create-parent
@@ -147,15 +186,13 @@ docker compose exec web flask --app wsgi:app create-parent
 All data lives in the `mongo-data` Docker volume.
 
 ```bash
-docker compose exec mongo mongodump --db questly --archive=/tmp/questly.gz --gzip
-docker compose cp mongo:/tmp/questly.gz ./questly-backup.gz
+docker compose exec -T mongo mongodump --db questly --archive --gzip > questly-backup.gz
 ```
 
 Restore:
 
 ```bash
-docker compose cp ./questly-backup.gz mongo:/tmp/questly.gz
-docker compose exec mongo mongorestore --archive=/tmp/questly.gz --gzip --drop
+docker compose exec -T mongo mongorestore --archive --gzip --drop < questly-backup.gz
 ```
 
 ### Starting completely over
@@ -166,7 +203,7 @@ docker compose down -v        # -v also deletes the database volume
 
 ---
 
-## Running without Docker
+## Development
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -177,19 +214,26 @@ flask --app wsgi:app run --debug --port 8000
 
 You'll need MongoDB listening on `localhost:27017`.
 
----
+### Tests
 
-## Checking everything still works
-
-There's an end-to-end smoke test that walks every flow — awarding, spending,
-approving, refunding, PIN login, the lot — against a throwaway database:
+An end-to-end smoke test walks every flow — awarding, spending, approving,
+refunding, PIN login, account changes, the lot — against a throwaway database:
 
 ```bash
 docker compose exec -e MONGO_DB=questly_test web python tests/smoke_test.py
 ```
 
 It refuses to run unless the database name ends in `_test`, so it can't touch
-your family's data.
+real data.
+
+### Regenerating the icons
+
+Every icon comes from one geometric spec, so the SVG and the PNGs can't drift
+apart. Edit `tools/make_icons.py` and run:
+
+```bash
+pip install pillow && python tools/make_icons.py
+```
 
 ---
 
@@ -199,15 +243,21 @@ your family's data.
 app/
   __init__.py      app factory, CSRF, template filters
   db.py            Mongo connection + indexes
-  models.py        all domain logic (points ledger, shop, quests)
+  models.py        all domain logic (points ledger, shop, quests, accounts)
   cli.py           flask CLI commands (seed-demo, create-parent)
   views/
     public.py      landing, who's-here, health check
-    auth.py        setup, parent login, kid PIN login
+    auth.py        first-run setup, grown-up login, kid PIN login
     kid.py         kid home, shop, history
-    parent.py      dashboard, awards, approvals, shop & quest admin
+    parent.py      dashboard, awards, approvals, shop & quests, family, account
   templates/       Jinja templates
-  static/          stylesheet and a little vanilla JS
+  static/
+    css/           one stylesheet
+    js/            a little vanilla JS — no build step, no dependencies
+    icons/         app icons, generated
+    manifest.webmanifest
+tools/
+  make_icons.py    regenerates every icon from one spec
 tests/
   smoke_test.py    end-to-end walk through every flow
 ```
@@ -216,9 +266,12 @@ tests/
 
 | Collection | Holds |
 | --- | --- |
-| `users` | parents and kids (kids carry their cached balance) |
+| `users` | grown-ups and kids (kids carry their cached balance) |
 | `transactions` | the point ledger — every change, with balance after |
 | `rewards` | shop items |
 | `redemptions` | purchases and their approval state |
 | `quests` | the quest board |
 | `quest_claims` | a kid's claim on a quest for one period |
+
+The app has no JavaScript build step and no frontend dependencies — it's Jinja
+templates, one stylesheet and one small script.
