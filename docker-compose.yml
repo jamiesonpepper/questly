@@ -21,7 +21,9 @@ services:
       - "${PORT:-37000}:8000"
     environment:
       SECRET_KEY: "${SECRET_KEY:-dev-only-change-me}"
-      MONGO_URI: "mongodb://mongo:27017/"
+      # Defaults to the bundled mongo service; override in .env to point
+      # at a MongoDB container you run yourself.
+      MONGO_URI: "${MONGO_URI:-mongodb://mongo:27017/}"
       MONGO_DB: "${MONGO_DB:-questly}"
       TZ: "${TZ:-Europe/London}"
     depends_on:

@@ -78,6 +78,39 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 
 ---
 
+## Using a MongoDB you already run
+
+The compose file ships a MongoDB container for convenience, but the app is
+happy talking to any MongoDB 5+ instance. To use your own — a container on a
+NAS, say — set `MONGO_URI` in `.env` and start only the web service:
+
+```bash
+docker compose up -d --no-deps web
+```
+
+`--no-deps` is what stops Compose from also starting the bundled `mongo`
+service. Without it you'd get two databases running and only one in use.
+
+Your MongoDB has to be reachable from inside the web container, which means
+one of:
+
+- **Same docker network** — put both containers on the same *user-defined*
+  network and address it by container name (`mongodb://my-mongodb:27017/`).
+  Docker's default `bridge` network does **not** resolve container names, so a
+  custom network is required for this to work.
+- **Via the host** — publish MongoDB's port on the host and point at the
+  host's LAN IP (`mongodb://192.168.1.50:27017/`).
+
+If your MongoDB has authentication turned on, include the credentials and the
+auth database: `mongodb://user:pass@host:27017/?authSource=admin`. Since `.env`
+is gitignored, those credentials stay off GitHub.
+
+The app creates its own collections and indexes on first use, so an empty
+database is all it needs. It only ever touches the database named by
+`MONGO_DB`, so sharing a MongoDB instance with other apps is fine.
+
+---
+
 ## Running it on your home network
 
 By default the app is reachable from other devices on your LAN at
