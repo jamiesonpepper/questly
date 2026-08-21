@@ -1,3 +1,13 @@
+"""Questly — a family points-and-rewards app.
+
+Copyright (C) 2026 Matt Hansford
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. See the LICENSE file, or <https://www.gnu.org/licenses/>.
+"""
+
 import os
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
