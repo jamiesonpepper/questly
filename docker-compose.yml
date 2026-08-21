@@ -18,7 +18,7 @@ services:
     container_name: questly-web
     restart: unless-stopped
     ports:
-      - "${PORT:-8080}:8000"
+      - "${PORT:-37000}:8000"
     environment:
       SECRET_KEY: "${SECRET_KEY:-dev-only-change-me}"
       MONGO_URI: "mongodb://mongo:27017/"

@@ -10,7 +10,7 @@ Built with Flask + MongoDB, runs in Docker.
 ## Quick start
 
 Already done on this machine — the stack is built and running, and `.env`
-has a freshly generated `SECRET_KEY`. Just open **http://localhost:8080**.
+has a freshly generated `SECRET_KEY`. Just open **http://localhost:37000**.
 
 Starting from scratch elsewhere:
 
@@ -65,7 +65,7 @@ Everything is set in `.env` (read by Docker Compose):
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `PORT` | `8080` | Host port the app is served on |
+| `PORT` | `37000` | Host port the app is served on |
 | `SECRET_KEY` | — | **Change this.** Signs session cookies |
 | `MONGO_DB` | `questly` | Database name |
 | `TZ` | `Europe/London` | Drives dates and daily/weekly quest resets |
@@ -81,7 +81,7 @@ python3 -c "import secrets; print(secrets.token_hex(32))"
 ## Running it on your home network
 
 By default the app is reachable from other devices on your LAN at
-**http://10.11.10.33:8080** — handy for kids on tablets or phones. The layout is
+**http://10.11.10.33:37000** — handy for kids on tablets or phones. The layout is
 mobile-first, so it works well saved to a home screen.
 
 (That address is this Mac's current IP; it can change when your router hands
