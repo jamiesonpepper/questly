@@ -19,7 +19,7 @@
 
     <form method="post" action="{{ url_for('auth.logout') }}" class="topbar__out">
       {{ csrf_field() }}
-      <span class="whoami">{{ current_user.name }}</span>
+      <a class="whoami" href="{{ url_for('parent.account') }}" title="Your account"><span class="whoami__face">{{ current_user.avatar or '🧑' }}</span><span class="whoami__name">{{ current_user.name }}</span></a>
       <button class="btn btn--ghost btn--sm" type="submit">Log out</button>
     </form>
   </div>

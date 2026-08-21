@@ -123,29 +123,62 @@
   {% endfor %}
 </div>
 
-<section class="card card--form">
-  <h2 class="card__title">Grown-ups</h2>
-  <div class="grownups">
-    {% for p in parents %}
-      <div class="grownup">
-        <span class="grownup__face">{{ p.avatar or '🧑' }}</span>
-        <div class="grownup__text">
-          <strong>{{ p.name }}</strong>
-          <span>{{ p.email }}</span>
-        </div>
-        {% if p._id != current_user._id %}
-          <form method="post" action="{{ url_for('parent.remove_parent', parent_id=p._id) }}">
-            {{ csrf_field() }}
-            <button class="btn btn--ghost btn--sm" type="submit"
-                    data-confirm="Remove {{ p.name }}'s login?">Remove</button>
-          </form>
-        {% else %}
-          <em class="tag">you</em>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </div>
+<div class="section__head"><h2>Grown-ups</h2></div>
 
+<div class="stacklist">
+  {% for p in parents %}
+    <details class="rowcard">
+      <summary>
+        <span class="rowcard__emoji">{{ p.avatar or '🧑' }}</span>
+        <span class="rowcard__title">
+          {{ p.name }}
+          {% if p._id == current_user._id %}<em class="tag">you</em>{% endif %}
+        </span>
+        <span class="grownup__email">{{ p.email }}</span>
+        <span class="rowcard__chev">&#9662;</span>
+      </summary>
+
+      {% if p._id == current_user._id %}
+        <div class="rowcard__body">
+          <p class="card__note">Change your name, email, icon or password on your own account page.</p>
+          <div class="rowcard__actions">
+            <a class="btn btn--primary btn--sm" href="{{ url_for('parent.account') }}">Edit my account</a>
+          </div>
+        </div>
+      {% else %}
+        <form method="post" action="{{ url_for('parent.reset_parent_password', parent_id=p._id) }}"
+              class="formgrid">
+          {{ csrf_field() }}
+          <p class="card__note field--full">
+            Set a new password for {{ p.name }} &mdash; useful if they're locked out.
+            Confirm with your own password.
+          </p>
+          <label class="field field--grow">
+            <span>New password for {{ p.name }}</span>
+            <input name="new_password" type="password" required minlength="8" autocomplete="new-password">
+          </label>
+          <label class="field field--grow">
+            <span>Your password</span>
+            <input name="your_password" type="password" required autocomplete="current-password">
+          </label>
+          <button class="btn btn--primary btn--sm" type="submit">Reset password</button>
+        </form>
+
+        <form method="post" action="{{ url_for('parent.remove_parent', parent_id=p._id) }}"
+              class="subform subform--danger">
+          {{ csrf_field() }}
+          <button class="btn btn--danger btn--sm" type="submit"
+                  data-confirm="Remove {{ p.name }}'s login? Their account and password are deleted.">
+            Remove {{ p.name }}
+          </button>
+        </form>
+      {% endif %}
+    </details>
+  {% endfor %}
+</div>
+
+<section class="card card--form">
+  <h2 class="card__title">Add a grown-up</h2>
   <form method="post" action="{{ url_for('parent.add_parent') }}" class="formgrid">
     {{ csrf_field() }}
     <label class="field field--grow">

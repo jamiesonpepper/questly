@@ -24,6 +24,7 @@ if not DB_NAME.endswith("_test"):
 
 from app import create_app
 from app.db import get_db
+from app.models import check_password
 
 FAILS = []
 
@@ -207,6 +208,95 @@ for path in ["/parent/", "/parent/approvals", "/parent/rewards", "/parent/quests
 check("/who renders", app.test_client().get("/who").status_code == 200)
 check("/healthz ok", app.test_client().get("/healthz").status_code == 200)
 check("404 page renders", app.test_client().get("/nope").status_code == 404)
+
+print("\n--- grown-up account: own details ---")
+t = token(parent, "/parent/account")
+parent.post("/parent/account/profile", data={
+    "_csrf": t, "name": "Matt H", "email": "matt.new@example.com",
+    "avatar": "\U0001f98a"}, follow_redirects=True)
+with app.app_context():
+    me = get_db().users.find_one({"role": "parent", "name": "Matt H"})
+check("name, email and icon all saved",
+      me and me["email"] == "matt.new@example.com" and me["avatar"] == "\U0001f98a")
+
+t = token(parent, "/parent/account")
+r = parent.post("/parent/account/profile", data={
+    "_csrf": t, "name": "Matt H", "email": "not-an-email"}, follow_redirects=True)
+with app.app_context():
+    me = get_db().users.find_one({"_id": me["_id"]})
+check("a malformed email is rejected", me["email"] == "matt.new@example.com")
+
+print("\n--- grown-up account: password ---")
+t = token(parent, "/parent/account")
+parent.post("/parent/account/password", data={
+    "_csrf": t, "current_password": "wrong-one",
+    "new_password": "brandnewpass", "confirm_password": "brandnewpass"},
+    follow_redirects=True)
+with app.app_context():
+    me = get_db().users.find_one({"_id": me["_id"]})
+check("wrong current password leaves it unchanged", check_password(me, "password123"))
+
+t = token(parent, "/parent/account")
+parent.post("/parent/account/password", data={
+    "_csrf": t, "current_password": "password123",
+    "new_password": "brandnewpass", "confirm_password": "mismatch"},
+    follow_redirects=True)
+with app.app_context():
+    me = get_db().users.find_one({"_id": me["_id"]})
+check("mismatched confirmation is refused", check_password(me, "password123"))
+
+t = token(parent, "/parent/account")
+parent.post("/parent/account/password", data={
+    "_csrf": t, "current_password": "password123",
+    "new_password": "brandnewpass", "confirm_password": "brandnewpass"},
+    follow_redirects=True)
+with app.app_context():
+    me = get_db().users.find_one({"_id": me["_id"]})
+check("correct current password changes it", check_password(me, "brandnewpass"))
+
+fresh = app.test_client()
+t = token(fresh, "/login")
+r = fresh.post("/login", data={"_csrf": t, "email": "matt.new@example.com",
+                               "password": "brandnewpass"}, follow_redirects=True)
+check("can log in with the new password", "Award points" in r.get_data(as_text=True))
+
+print("\n--- resetting the other grown-up's password ---")
+t = token(parent, "/parent/family")
+parent.post("/parent/family/parents", data={
+    "_csrf": t, "name": "Partner", "email": "partner@example.com",
+    "password": "partnerpass"}, follow_redirects=True)
+with app.app_context():
+    other = get_db().users.find_one({"email": "partner@example.com"})
+check("second grown-up added", other is not None)
+
+t = token(parent, "/parent/family")
+parent.post(f"/parent/family/parents/{other['_id']}/password", data={
+    "_csrf": t, "new_password": "resetbyme1", "your_password": "wrong"},
+    follow_redirects=True)
+with app.app_context():
+    other = get_db().users.find_one({"_id": other["_id"]})
+check("reset refused without your own password", check_password(other, "partnerpass"))
+
+t = token(parent, "/parent/family")
+parent.post(f"/parent/family/parents/{other['_id']}/password", data={
+    "_csrf": t, "new_password": "resetbyme1", "your_password": "brandnewpass"},
+    follow_redirects=True)
+with app.app_context():
+    other = get_db().users.find_one({"_id": other["_id"]})
+check("reset works when you confirm with yours", check_password(other, "resetbyme1"))
+
+t = token(parent, "/parent/account")
+r = parent.post("/parent/account/profile", data={
+    "_csrf": t, "name": "Matt H", "email": "partner@example.com"},
+    follow_redirects=True)
+with app.app_context():
+    me = get_db().users.find_one({"_id": me["_id"]})
+check("can't take an email another account uses",
+      me["email"] == "matt.new@example.com")
+
+print("\n--- a kid can't reach the account pages ---")
+check("kid blocked from /parent/account",
+      kidcli.get("/parent/account", follow_redirects=False).status_code in (301, 302))
 
 print("\n--- logout ---")
 t = token(kidcli, "/me/")

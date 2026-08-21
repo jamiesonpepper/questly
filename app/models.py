@@ -14,6 +14,13 @@ AVATARS = [
     "\U0001f994", "\U0001f43b", "\U0001f414", "\U0001f420", "\U0001f9a9",
 ]
 
+PARENT_AVATARS = [
+    "\U0001f9d1", "\U0001f469", "\U0001f468", "\U0001f9d4", "\U0001f475",
+    "\U0001f474", "\U0001f478", "\U0001f934", "\U0001f977", "\U0001f9b8",
+    "\U0001f9d9", "\U0001f9da", "\U0001f43b", "\U0001f98a", "\U0001f981",
+    "\U0001f989", "\U0001f43a", "\U0001f428", "\U0001f996", "\U0001f419",
+]
+
 COLORS = [
     ("grape", "#7c4dff"),
     ("bubblegum", "#ff4d94"),
@@ -114,6 +121,64 @@ def verify_kid_pin(kid, pin):
     if not kid.get("pin_hash"):
         return True  # no PIN set: tap the avatar and you're in
     return bool(pin) and check_password_hash(kid["pin_hash"], pin)
+
+
+def check_password(user, password):
+    """Is this the user's current password?"""
+    if not user or not user.get("password_hash"):
+        return False
+    return check_password_hash(user["password_hash"], password)
+
+
+def update_parent(db, parent_id, name=None, email=None, avatar=None):
+    """Update a grown-up's profile. Returns (ok, error_message)."""
+    _id = oid(parent_id)
+    if not _id:
+        return False, "Couldn't find that account."
+
+    changes = {}
+
+    if name is not None:
+        name = name.strip()[:40]
+        if not name:
+            return False, "A name can't be blank."
+        changes["name"] = name
+
+    if email is not None:
+        email = email.strip().lower()
+        if "@" not in email or len(email) < 5:
+            return False, "That doesn't look like an email address."
+        clash = db.users.find_one({"email": email, "_id": {"$ne": _id}})
+        if clash:
+            return False, "Another account already uses that email."
+        changes["email"] = email
+
+    if avatar:
+        changes["avatar"] = avatar[:8]
+
+    if not changes:
+        return False, "Nothing to change."
+
+    result = db.users.update_one({"_id": _id, "role": "parent"}, {"$set": changes})
+    if not result.matched_count:
+        return False, "Couldn't find that account."
+    return True, None
+
+
+def set_parent_password(db, parent_id, password):
+    """Returns (ok, error_message)."""
+    _id = oid(parent_id)
+    if not _id:
+        return False, "Couldn't find that account."
+    if len(password or "") < 8:
+        return False, "Use a password of at least 8 characters."
+    result = db.users.update_one(
+        {"_id": _id, "role": "parent"},
+        {"$set": {"password_hash": generate_password_hash(password)}},
+    )
+    if not result.matched_count:
+        return False, "Couldn't find that account."
+    return True, None
 
 
 def set_kid_pin(db, kid_id, pin):

@@ -155,7 +155,22 @@ input, select, button, textarea { font: inherit; color: inherit; }
 .topnav a.is-active .pip { background: #fff; color: var(--grape); }
 
 .topbar__out { display: flex; align-items: center; gap: 10px; }
-.whoami { font-weight: 800; font-size: .9rem; color: var(--ink-2); }
+.whoami {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px 6px 7px;
+  border-radius: 999px;
+  font-weight: 800; font-size: .9rem;
+  color: var(--ink-2);
+  transition: background .15s, color .15s;
+}
+.whoami:hover { background: rgba(124, 77, 255, .10); color: var(--grape); }
+.whoami__face {
+  display: grid; place-items: center;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  background: rgba(124, 77, 255, .14);
+  font-size: .95rem;
+}
 
 /* --- buttons ------------------------------------------------------------ */
 .btn {
@@ -551,6 +566,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
 .field--num { flex: 0 1 130px; }
 .field--full { flex: 1 1 100%; }
 .field--emoji { flex: 0 0 78px; }
+p.field--full { flex: 1 1 100%; margin: 0; }
 .emoji-input { text-align: center; font-size: 1.4rem; padding: 7px 4px; }
 .field--emoji input { width: 78px; }
 .card--form > .formgrid { margin: 0; }
@@ -642,6 +658,13 @@ input, select, button, textarea { font: inherit; color: inherit; }
   text-transform: uppercase; letter-spacing: .03em;
   vertical-align: middle;
 }
+
+.grownup__email {
+  color: var(--ink-3); font-size: .82rem; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  max-width: 40%;
+}
+.rowcard__body { padding: 0 0 4px; }
 
 .grownups { display: flex; flex-direction: column; gap: 8px; }
 .grownup {
@@ -759,7 +782,8 @@ input, select, button, textarea { font: inherit; color: inherit; }
   .topnav { order: 3; width: 100%; margin-left: 0; overflow-x: auto; flex-wrap: nowrap; }
   .topnav a { flex: 0 0 auto; }
   .topbar__out { margin-left: auto; }
-  .whoami { display: none; }
+  .whoami { padding: 5px; }
+  .whoami__name { display: none; }   /* keep the avatar tappable */
   .kidhead__name { font-size: 1.4rem; }
   .kidhead__face { width: 52px; height: 52px; font-size: 2.1rem; }
   .balance__n { font-size: 1.3rem; }

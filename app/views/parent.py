@@ -2,12 +2,14 @@ from flask import (Blueprint, flash, g, redirect, render_template, request,
                    url_for)
 
 from ..db import get_db
-from ..models import (AVATARS, COLORS, REPEAT_CHOICES, adjust_points,
+from ..models import (AVATARS, COLORS, PARENT_AVATARS, REPEAT_CHOICES,
+                      adjust_points, check_password,
                       create_kid, create_parent, decide_quest_claim,
                       decide_redemption, get_quest, get_reward, get_user,
                       history_for, list_kids, list_parents, list_quests,
                       list_rewards, oid, pending_claims, pending_redemptions,
-                      recent_activity, redemptions_for, set_kid_pin)
+                      recent_activity, redemptions_for, set_kid_pin,
+                      set_parent_password, update_parent)
 from .helpers import as_int, parent_required, safe_next
 
 bp = Blueprint("parent", __name__, url_prefix="/parent")
@@ -349,6 +351,77 @@ def add_parent():
     else:
         create_parent(db, name, email, password)
         flash(f"{name} can now log in as a grown-up.", "success")
+    return redirect(url_for("parent.family"))
+
+
+# ---------------------------------------------------------------------------
+# your own account
+# ---------------------------------------------------------------------------
+
+@bp.get("/account")
+@parent_required
+def account():
+    return render_template("parent/account.html",
+                           me=g.user,
+                           avatars=PARENT_AVATARS)
+
+
+@bp.post("/account/profile")
+@parent_required
+def update_profile():
+    ok, error = update_parent(
+        get_db(), g.user["_id"],
+        name=request.form.get("name", ""),
+        email=request.form.get("email", ""),
+        avatar=request.form.get("avatar") or None,
+    )
+    flash(error if error else "Saved.", "error" if error else "success")
+    return redirect(url_for("parent.account"))
+
+
+@bp.post("/account/password")
+@parent_required
+def change_password():
+    db = get_db()
+    current = request.form.get("current_password", "")
+    new = request.form.get("new_password", "")
+    confirm = request.form.get("confirm_password", "")
+
+    if not check_password(g.user, current):
+        flash("Your current password wasn't right.", "error")
+    elif new != confirm:
+        flash("The two new passwords don't match.", "error")
+    else:
+        ok, error = set_parent_password(db, g.user["_id"], new)
+        flash(error if error else "Password changed.",
+              "error" if error else "success")
+    return redirect(url_for("parent.account"))
+
+
+@bp.post("/family/parents/<parent_id>/password")
+@parent_required
+def reset_parent_password(parent_id):
+    """Either grown-up can reset the other's password. Confirming with your
+    own password stops someone using an unlocked session to take over."""
+    db = get_db()
+    target = get_user(db, parent_id)
+
+    if not target or target["role"] != "parent":
+        flash("Couldn't find that account.", "error")
+        return redirect(url_for("parent.family"))
+    if target["_id"] == g.user["_id"]:
+        return redirect(url_for("parent.account"))
+
+    if not check_password(g.user, request.form.get("your_password", "")):
+        flash("Confirm with your own password to reset someone else's.", "error")
+        return redirect(url_for("parent.family"))
+
+    ok, error = set_parent_password(db, target["_id"],
+                                    request.form.get("new_password", ""))
+    if error:
+        flash(error, "error")
+    else:
+        flash(f"Set a new password for {target['name']}. Let them know.", "success")
     return redirect(url_for("parent.family"))
 
 

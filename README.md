@@ -45,6 +45,8 @@ the front page and type a 4–6 digit PIN — or no PIN at all for younger kids.
 | **Shop** | Rewards you create, each with a point cost, an emoji and optional limited stock. |
 | **Buying** | Points are deducted the moment a kid buys, and the reward queues up for you to hand over. Turning a request down refunds the points automatically. |
 | **Approvals** | One page listing every quest and purchase waiting on you. The nav shows a count badge. |
+| **Your account** | Each grown-up can change their own name, login email, icon and password. Reach it by tapping your name in the top bar. |
+| **Locked out?** | Either grown-up can set a new password for the other, confirmed with their own password. There's no email recovery, so this is the way back in. |
 
 Every point movement is written to a ledger, so each kid gets a full history
 with a running balance.
