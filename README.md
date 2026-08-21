@@ -14,6 +14,7 @@
   <img alt="Flask" src="https://img.shields.io/badge/Flask-3.1-000?logo=flask&logoColor=white">
   <img alt="MongoDB" src="https://img.shields.io/badge/MongoDB-5%2B-13aa52?logo=mongodb&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/Docker-compose-2496ed?logo=docker&logoColor=white">
+  <img alt="Licence: PolyForm Noncommercial 1.0.0" src="https://img.shields.io/badge/licence-PolyForm%20Noncommercial-7c4dff">
 </p>
 
 > [!NOTE]
@@ -251,6 +252,24 @@ apart. Edit `tools/make_icons.py` and run:
 ```bash
 pip install pillow && python tools/make_icons.py
 ```
+
+---
+
+## Licence
+
+[PolyForm Noncommercial 1.0.0](LICENSE) — **free for homes, families, schools,
+charities and hobby projects.** Use it, change it, run it, share your changes.
+
+**Not permitted:** commercial use of any kind. That includes selling it,
+charging for access, running it as a paid or ad-supported service, or bundling
+it into a commercial product.
+
+> This is a *source-available* licence, not an OSI-approved open source one.
+> Open source licences must permit commercial use; this one deliberately does
+> not, so calling it "open source" would be wrong. GitHub won't show a licence
+> name in the sidebar for the same reason — it only recognises a fixed list.
+
+Want to use it commercially? Ask — that's a conversation, not a no.
 
 ---
 
