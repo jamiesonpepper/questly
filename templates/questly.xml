@@ -33,6 +33,9 @@ If your MongoDB container is on Unraid's default bridge network, container names
 
   <License>AGPL-3.0-or-later</License>
   <Changes>
+### 1.0.2
+Registry compatibility fix for the published image.
+
 ### 1.0.0
 First release.
   </Changes>

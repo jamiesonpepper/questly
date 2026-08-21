@@ -9,6 +9,16 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [1.0.2] — 2026-08-21
+
+### Fixed
+
+- Published images no longer carry buildx provenance/SBOM attestations.
+  These turned the manifest into an OCI image index containing
+  `unknown/unknown` entries, which tools expecting the older Docker
+  manifest-list media type read as a missing tag — Unraid Community
+  Applications' scanner among them, blocking the listing.
+
 ## [1.0.1] — 2026-08-21
 
 No changes to the app itself — this release exists to publish container images
@@ -86,6 +96,7 @@ First release.
 - CSRF protection on every mutation, and route guards keeping children out of
   grown-up pages.
 
-[Unreleased]: https://github.com/mahansford/questly/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/mahansford/questly/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/mahansford/questly/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/mahansford/questly/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/mahansford/questly/releases/tag/v1.0.0
