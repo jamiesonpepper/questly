@@ -117,8 +117,18 @@ input, select, button, textarea { font: inherit; color: inherit; }
   display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
 }
 .brand { display: flex; align-items: center; gap: 9px; }
-.brand__mark { font-size: 1.6rem; line-height: 1; }
-.brand__mark--xl { font-size: 3.4rem; display: block; }
+.brand__mark {
+  width: 34px; height: 34px;
+  display: block;
+  /* the SVG carries its own rounded corners */
+  filter: drop-shadow(0 3px 6px rgba(60, 30, 120, .28));
+}
+.brand__mark--xl {
+  width: 92px; height: 92px;
+  filter: drop-shadow(0 10px 22px rgba(60, 30, 120, .30));
+}
+/* the grown-up signpost on the login screen, still an emoji */
+.gate__face { font-size: 3.4rem; line-height: 1; display: block; }
 .brand__name { font-family: var(--font-display); font-weight: 800; font-size: 1.35rem; }
 
 .topnav { display: flex; gap: 4px; margin-left: auto; flex-wrap: wrap; }
