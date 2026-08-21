@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}Shop &middot; {{ app_name }}{% endblock %}
+
+{% block content %}
+<div class="section__head section__head--page">
+  <h2>The shop</h2>
+  <span class="section__hint">{{ rewards | selectattr('active') | list | length }} on sale</span>
+</div>
+
+<section class="card card--form">
+  <h2 class="card__title">Add a reward</h2>
+  <form method="post" action="{{ url_for('parent.create_reward') }}" class="formgrid">
+    {{ csrf_field() }}
+    <label class="field field--emoji">
+      <span>Icon</span>
+      <input name="emoji" maxlength="4" value="&#127873;" class="emoji-input">
+    </label>
+    <label class="field field--grow">
+      <span>Name</span>
+      <input name="title" required maxlength="80" placeholder="Extra screen time">
+    </label>
+    <label class="field field--num">
+      <span>Cost</span>
+      <input name="cost" type="number" min="1" max="100000" value="20" inputmode="numeric" required>
+    </label>
+    <label class="field field--num">
+      <span>Stock</span>
+      <input name="stock" type="number" min="0" max="9999" placeholder="&#8734;" inputmode="numeric">
+    </label>
+    <label class="field field--full">
+      <span>Description <em>(optional)</em></span>
+      <input name="description" maxlength="240" placeholder="30 minutes, your choice of device">
+    </label>
+    <button class="btn btn--primary" type="submit">Add to shop</button>
+  </form>
+</section>
+
+<div class="stacklist">
+  {% for r in rewards %}
+    <details class="rowcard {{ 'is-off' if not r.active }}">
+      <summary>
+        <span class="rowcard__emoji">{{ r.emoji }}</span>
+        <span class="rowcard__title">
+          {{ r.title }}
+          {% if not r.active %}<em class="tag">hidden</em>{% endif %}
+          {% if r.stock is not none %}<em class="tag">{{ r.stock }} left</em>{% endif %}
+        </span>
+        <span class="price">{{ r.cost }} &#11088;</span>
+        <span class="rowcard__chev">&#9662;</span>
+      </summary>
+
+      <form method="post" action="{{ url_for('parent.update_reward', reward_id=r._id) }}" class="formgrid">
+        {{ csrf_field() }}
+        <label class="field field--emoji">
+          <span>Icon</span>
+          <input name="emoji" maxlength="4" value="{{ r.emoji }}" class="emoji-input">
+        </label>
+        <label class="field field--grow">
+          <span>Name</span>
+          <input name="title" value="{{ r.title }}" maxlength="80" required>
+        </label>
+        <label class="field field--num">
+          <span>Cost</span>
+          <input name="cost" type="number" min="1" max="100000" value="{{ r.cost }}" required>
+        </label>
+        <label class="field field--num">
+          <span>Stock</span>
+          <input name="stock" type="number" min="0" max="9999"
+                 value="{{ r.stock if r.stock is not none else '' }}" placeholder="&#8734;">
+        </label>
+        <label class="field field--full">
+          <span>Description</span>
+          <input name="description" value="{{ r.description or '' }}" maxlength="240">
+        </label>
+        <div class="rowcard__actions">
+          <button class="btn btn--primary btn--sm" type="submit" name="action" value="save">Save</button>
+          <button class="btn btn--ghost btn--sm" type="submit" name="action" value="toggle">
+            {{ 'Show in shop' if not r.active else 'Hide from shop' }}
+          </button>
+          <button class="btn btn--danger btn--sm" type="submit" name="action" value="delete"
+                  data-confirm="Delete '{{ r.title }}' from the shop?">Delete</button>
+        </div>
+      </form>
+    </details>
+  {% else %}
+    <div class="empty empty--big">
+      <div class="empty__emoji">&#128717;&#65039;</div>
+      <p>No rewards yet. Add the first one above.</p>
+    </div>
+  {% endfor %}
+</div>
+{% endblock %}

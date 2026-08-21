@@ -1,0 +1,369 @@
+from flask import (Blueprint, flash, g, redirect, render_template, request,
+                   url_for)
+
+from ..db import get_db
+from ..models import (AVATARS, COLORS, REPEAT_CHOICES, adjust_points,
+                      create_kid, create_parent, decide_quest_claim,
+                      decide_redemption, get_quest, get_reward, get_user,
+                      history_for, list_kids, list_parents, list_quests,
+                      list_rewards, oid, pending_claims, pending_redemptions,
+                      recent_activity, redemptions_for, set_kid_pin)
+from .helpers import as_int, parent_required, safe_next
+
+bp = Blueprint("parent", __name__, url_prefix="/parent")
+
+QUICK_AWARDS = [1, 5, 10, 25]
+
+
+@bp.get("/")
+@parent_required
+def dashboard():
+    db = get_db()
+    kids = list_kids(db)
+    return render_template(
+        "parent/dashboard.html",
+        kids=kids,
+        quick=QUICK_AWARDS,
+        activity=recent_activity(db, limit=12),
+        redemptions=pending_redemptions(db),
+        claims=pending_claims(db),
+    )
+
+
+# ---------------------------------------------------------------------------
+# points
+# ---------------------------------------------------------------------------
+
+@bp.post("/award")
+@parent_required
+def award():
+    db = get_db()
+    kid_id = request.form.get("kid_id", "")
+    amount = as_int(request.form.get("amount"), default=0, low=-1000, high=1000)
+    reason = request.form.get("reason", "").strip()[:120]
+
+    # The "Take away" button reuses the same amount box.
+    if request.form.get("negate"):
+        amount = -abs(amount)
+
+    if amount == 0:
+        flash("Pick an amount first.", "warn")
+        return redirect(safe_next(url_for("parent.dashboard")))
+
+    kid, _ = adjust_points(db, kid_id, amount, reason, g.user,
+                           kind="award" if amount > 0 else "deduct")
+    if not kid:
+        flash("Couldn't find that child.", "error")
+    else:
+        verb = "Gave" if amount > 0 else "Took"
+        flash(f"{verb} {abs(amount)} points {'to' if amount > 0 else 'from'} {kid['name']}.",
+              "success")
+    return redirect(safe_next(url_for("parent.dashboard")))
+
+
+@bp.get("/kid/<kid_id>")
+@parent_required
+def kid_detail(kid_id):
+    db = get_db()
+    kid = get_user(db, kid_id)
+    if not kid or kid["role"] != "kid":
+        flash("Couldn't find that child.", "error")
+        return redirect(url_for("parent.dashboard"))
+    return render_template(
+        "parent/kid_detail.html",
+        kid=kid,
+        quick=QUICK_AWARDS,
+        history=history_for(db, kid["_id"], limit=60),
+        redemptions=redemptions_for(db, kid["_id"], limit=20),
+        avatars=AVATARS,
+    )
+
+
+# ---------------------------------------------------------------------------
+# approvals
+# ---------------------------------------------------------------------------
+
+@bp.get("/approvals")
+@parent_required
+def approvals():
+    db = get_db()
+    return render_template(
+        "parent/approvals.html",
+        redemptions=pending_redemptions(db),
+        claims=pending_claims(db),
+    )
+
+
+@bp.post("/approvals/redemption/<redemption_id>")
+@parent_required
+def decide_redemption_route(redemption_id):
+    approve = request.form.get("decision") == "approve"
+    red = decide_redemption(get_db(), redemption_id, approve, g.user)
+    if not red:
+        flash("That request was already dealt with.", "warn")
+    elif approve:
+        flash(f"Marked '{red['reward_title']}' as handed over to {red['kid_name']}.", "success")
+    else:
+        flash(f"Turned down '{red['reward_title']}' — {red['cost']} points refunded.", "info")
+    return redirect(safe_next(url_for("parent.approvals")))
+
+
+@bp.post("/approvals/quest/<claim_id>")
+@parent_required
+def decide_claim_route(claim_id):
+    approve = request.form.get("decision") == "approve"
+    claim = decide_quest_claim(get_db(), claim_id, approve, g.user)
+    if not claim:
+        flash("That request was already dealt with.", "warn")
+    elif approve:
+        flash(f"{claim['kid_name']} earned {claim['points']} points for "
+              f"'{claim['quest_title']}'.", "success")
+    else:
+        flash(f"Sent '{claim['quest_title']}' back to {claim['kid_name']}.", "info")
+    return redirect(safe_next(url_for("parent.approvals")))
+
+
+# ---------------------------------------------------------------------------
+# rewards
+# ---------------------------------------------------------------------------
+
+@bp.get("/rewards")
+@parent_required
+def rewards():
+    db = get_db()
+    return render_template("parent/rewards.html",
+                           rewards=list_rewards(db, active_only=False))
+
+
+@bp.post("/rewards")
+@parent_required
+def create_reward():
+    db = get_db()
+    title = request.form.get("title", "").strip()[:80]
+    if not title:
+        flash("Give the reward a name.", "error")
+        return redirect(url_for("parent.rewards"))
+
+    stock_raw = request.form.get("stock", "").strip()
+    db.rewards.insert_one({
+        "title": title,
+        "description": request.form.get("description", "").strip()[:240],
+        "emoji": (request.form.get("emoji", "").strip() or "\U0001f381")[:4],
+        "cost": as_int(request.form.get("cost"), default=10, low=1, high=100000),
+        "stock": as_int(stock_raw, default=0, low=0, high=9999) if stock_raw else None,
+        "active": True,
+    })
+    flash(f"Added '{title}' to the shop.", "success")
+    return redirect(url_for("parent.rewards"))
+
+
+@bp.post("/rewards/<reward_id>")
+@parent_required
+def update_reward(reward_id):
+    db = get_db()
+    reward = get_reward(db, reward_id)
+    if not reward:
+        flash("Couldn't find that reward.", "error")
+        return redirect(url_for("parent.rewards"))
+
+    action = request.form.get("action")
+    if action == "toggle":
+        db.rewards.update_one({"_id": reward["_id"]},
+                              {"$set": {"active": not reward.get("active", True)}})
+        flash(f"'{reward['title']}' is now "
+              f"{'hidden from' if reward.get('active') else 'back in'} the shop.", "info")
+    elif action == "delete":
+        db.rewards.delete_one({"_id": reward["_id"]})
+        flash(f"Removed '{reward['title']}'.", "info")
+    else:
+        stock_raw = request.form.get("stock", "").strip()
+        db.rewards.update_one({"_id": reward["_id"]}, {"$set": {
+            "title": request.form.get("title", reward["title"]).strip()[:80] or reward["title"],
+            "description": request.form.get("description", "").strip()[:240],
+            "emoji": (request.form.get("emoji", "").strip() or "\U0001f381")[:4],
+            "cost": as_int(request.form.get("cost"), default=reward["cost"], low=1, high=100000),
+            "stock": as_int(stock_raw, default=0, low=0, high=9999) if stock_raw else None,
+        }})
+        flash(f"Updated '{reward['title']}'.", "success")
+    return redirect(url_for("parent.rewards"))
+
+
+# ---------------------------------------------------------------------------
+# quests
+# ---------------------------------------------------------------------------
+
+@bp.get("/quests")
+@parent_required
+def quests():
+    db = get_db()
+    return render_template("parent/quests.html",
+                           quests=list_quests(db, active_only=False),
+                           kids=list_kids(db),
+                           repeats=REPEAT_CHOICES)
+
+
+@bp.post("/quests")
+@parent_required
+def create_quest():
+    db = get_db()
+    title = request.form.get("title", "").strip()[:80]
+    if not title:
+        flash("Give the quest a name.", "error")
+        return redirect(url_for("parent.quests"))
+
+    repeat = request.form.get("repeat", "daily")
+    assigned = [oid(v) for v in request.form.getlist("assigned_to")]
+    db.quests.insert_one({
+        "title": title,
+        "emoji": (request.form.get("emoji", "").strip() or "⭐")[:4],
+        "points": as_int(request.form.get("points"), default=5, low=1, high=1000),
+        "repeat": repeat if repeat in REPEAT_CHOICES else "daily",
+        "assigned_to": [a for a in assigned if a],
+        "active": True,
+    })
+    flash(f"Added the quest '{title}'.", "success")
+    return redirect(url_for("parent.quests"))
+
+
+@bp.post("/quests/<quest_id>")
+@parent_required
+def update_quest(quest_id):
+    db = get_db()
+    quest = get_quest(db, quest_id)
+    if not quest:
+        flash("Couldn't find that quest.", "error")
+        return redirect(url_for("parent.quests"))
+
+    action = request.form.get("action")
+    if action == "toggle":
+        db.quests.update_one({"_id": quest["_id"]},
+                             {"$set": {"active": not quest.get("active", True)}})
+        flash(f"'{quest['title']}' is now "
+              f"{'paused' if quest.get('active') else 'active'}.", "info")
+    elif action == "delete":
+        db.quests.delete_one({"_id": quest["_id"]})
+        db.quest_claims.delete_many({"quest_id": quest["_id"], "status": "pending"})
+        flash(f"Removed '{quest['title']}'.", "info")
+    else:
+        repeat = request.form.get("repeat", quest.get("repeat", "daily"))
+        assigned = [oid(v) for v in request.form.getlist("assigned_to")]
+        db.quests.update_one({"_id": quest["_id"]}, {"$set": {
+            "title": request.form.get("title", quest["title"]).strip()[:80] or quest["title"],
+            "emoji": (request.form.get("emoji", "").strip() or "⭐")[:4],
+            "points": as_int(request.form.get("points"), default=quest["points"], low=1, high=1000),
+            "repeat": repeat if repeat in REPEAT_CHOICES else "daily",
+            "assigned_to": [a for a in assigned if a],
+        }})
+        flash(f"Updated '{quest['title']}'.", "success")
+    return redirect(url_for("parent.quests"))
+
+
+# ---------------------------------------------------------------------------
+# family
+# ---------------------------------------------------------------------------
+
+@bp.get("/family")
+@parent_required
+def family():
+    db = get_db()
+    return render_template("parent/family.html",
+                           kids=list_kids(db),
+                           parents=list_parents(db),
+                           avatars=AVATARS,
+                           colors=COLORS)
+
+
+@bp.post("/family/kids")
+@parent_required
+def add_kid():
+    db = get_db()
+    name = request.form.get("name", "").strip()[:40]
+    if not name:
+        flash("What's their name?", "error")
+        return redirect(url_for("parent.family"))
+
+    pin = request.form.get("pin", "").strip()
+    if pin and not (pin.isdigit() and 4 <= len(pin) <= 6):
+        flash("A PIN needs to be 4-6 digits (or leave it blank).", "error")
+        return redirect(url_for("parent.family"))
+
+    create_kid(db, name,
+               request.form.get("avatar") or AVATARS[0],
+               request.form.get("color") or COLORS[0][1],
+               pin=pin or None,
+               points=as_int(request.form.get("points"), default=0, low=0, high=100000))
+    flash(f"{name} is in! They can log in from the front page.", "success")
+    return redirect(url_for("parent.family"))
+
+
+@bp.post("/family/kids/<kid_id>")
+@parent_required
+def update_kid(kid_id):
+    db = get_db()
+    kid = get_user(db, kid_id)
+    if not kid or kid["role"] != "kid":
+        flash("Couldn't find that child.", "error")
+        return redirect(url_for("parent.family"))
+
+    action = request.form.get("action")
+    if action == "delete":
+        db.users.delete_one({"_id": kid["_id"]})
+        db.transactions.delete_many({"kid_id": kid["_id"]})
+        db.redemptions.delete_many({"kid_id": kid["_id"]})
+        db.quest_claims.delete_many({"kid_id": kid["_id"]})
+        flash(f"Removed {kid['name']} and their history.", "info")
+        return redirect(url_for("parent.family"))
+
+    if action == "pin":
+        pin = request.form.get("pin", "").strip()
+        if pin and not (pin.isdigit() and 4 <= len(pin) <= 6):
+            flash("A PIN needs to be 4-6 digits (or leave it blank for none).", "error")
+        else:
+            set_kid_pin(db, kid["_id"], pin or None)
+            flash(f"{kid['name']}'s PIN {'updated' if pin else 'removed'}.", "success")
+        return redirect(url_for("parent.family"))
+
+    db.users.update_one({"_id": kid["_id"]}, {"$set": {
+        "name": request.form.get("name", kid["name"]).strip()[:40] or kid["name"],
+        "avatar": request.form.get("avatar") or kid.get("avatar"),
+        "color": request.form.get("color") or kid.get("color"),
+    }})
+    flash("Saved.", "success")
+    return redirect(url_for("parent.family"))
+
+
+@bp.post("/family/parents")
+@parent_required
+def add_parent():
+    db = get_db()
+    name = request.form.get("name", "").strip()[:40]
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+
+    if not name or "@" not in email:
+        flash("Need a name and a valid email address.", "error")
+    elif len(password) < 8:
+        flash("Use a password of at least 8 characters.", "error")
+    elif db.users.find_one({"email": email}):
+        flash("Someone already uses that email.", "error")
+    else:
+        create_parent(db, name, email, password)
+        flash(f"{name} can now log in as a grown-up.", "success")
+    return redirect(url_for("parent.family"))
+
+
+@bp.post("/family/parents/<parent_id>/delete")
+@parent_required
+def remove_parent(parent_id):
+    db = get_db()
+    target = get_user(db, parent_id)
+    if not target or target["role"] != "parent":
+        flash("Couldn't find that account.", "error")
+    elif target["_id"] == g.user["_id"]:
+        flash("You can't remove your own account while you're using it.", "warn")
+    elif db.users.count_documents({"role": "parent"}) <= 1:
+        flash("There has to be at least one grown-up account.", "warn")
+    else:
+        db.users.delete_one({"_id": target["_id"]})
+        flash(f"Removed {target['name']}.", "info")
+    return redirect(url_for("parent.family"))

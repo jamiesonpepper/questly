@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#7c4dff">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>&#11088;</text></svg>">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <div class="blobs" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  {% block chrome %}{% include 'partials/topbar.html' %}{% endblock %}
+
+  <main class="page">
+    {% include 'partials/flashes.html' %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% block bottomnav %}{% endblock %}
+
+  <canvas id="confetti" aria-hidden="true"></canvas>
+  {% if celebrate %}<div class="toast-pop" data-celebrate>{{ celebrate }}</div>{% endif %}
+
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

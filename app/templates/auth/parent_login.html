@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Grown-up login &middot; {{ app_name }}{% endblock %}
+{% block body_class %}gate{% endblock %}
+{% block chrome %}{% endblock %}
+
+{% block content %}
+<div class="gate__wrap gate__wrap--narrow">
+  <div class="gate__logo">
+    <span class="brand__mark brand__mark--xl">&#129485;</span>
+    <h1 class="gate__title">Grown-ups</h1>
+    <p class="gate__sub">Log in to award points and run the shop.</p>
+  </div>
+
+  <form class="card card--form" method="post">
+    {{ csrf_field() }}
+    <label class="field">
+      <span>Email</span>
+      <input name="email" type="email" required autocomplete="username" autofocus>
+    </label>
+    <label class="field">
+      <span>Password</span>
+      <input name="password" type="password" required autocomplete="current-password">
+    </label>
+    <button class="btn btn--primary btn--block" type="submit">Log in</button>
+  </form>
+
+  <a class="gate__back" href="{{ url_for('public.who') }}">&larr; Back to who's here</a>
+</div>
+{% endblock %}

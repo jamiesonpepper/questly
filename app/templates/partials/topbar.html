@@ -1,0 +1,27 @@
+{% if current_user and current_user.role == 'parent' %}
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="brand" href="{{ url_for('parent.dashboard') }}">
+      <span class="brand__mark">&#11088;</span>
+      <span class="brand__name">{{ app_name }}</span>
+    </a>
+
+    <nav class="topnav">
+      <a href="{{ url_for('parent.dashboard') }}" class="{{ 'is-active' if request.endpoint == 'parent.dashboard' }}">Home</a>
+      <a href="{{ url_for('parent.approvals') }}" class="{{ 'is-active' if request.endpoint == 'parent.approvals' }}">
+        Approvals
+        {% if approvals_waiting %}<span class="pip">{{ approvals_waiting }}</span>{% endif %}
+      </a>
+      <a href="{{ url_for('parent.rewards') }}" class="{{ 'is-active' if request.endpoint == 'parent.rewards' }}">Shop</a>
+      <a href="{{ url_for('parent.quests') }}" class="{{ 'is-active' if request.endpoint == 'parent.quests' }}">Quests</a>
+      <a href="{{ url_for('parent.family') }}" class="{{ 'is-active' if request.endpoint == 'parent.family' }}">Family</a>
+    </nav>
+
+    <form method="post" action="{{ url_for('auth.logout') }}" class="topbar__out">
+      {{ csrf_field() }}
+      <span class="whoami">{{ current_user.name }}</span>
+      <button class="btn btn--ghost btn--sm" type="submit">Log out</button>
+    </form>
+  </div>
+</header>
+{% endif %}

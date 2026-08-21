@@ -1,0 +1,166 @@
+/* Questly — small, dependency-free interactions. */
+(function () {
+  "use strict";
+
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------------------------------------------------------------- confirm
+     Any button with data-confirm asks before it submits. */
+  document.addEventListener("click", function (e) {
+    const btn = e.target.closest("[data-confirm]");
+    if (btn && !window.confirm(btn.getAttribute("data-confirm"))) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+
+  /* ------------------------------------------------------- dismiss flashes */
+  document.addEventListener("click", function (e) {
+    const x = e.target.closest("[data-dismiss]");
+    if (x) x.closest(".flash").remove();
+  });
+
+  document.querySelectorAll(".flash").forEach(function (flash) {
+    setTimeout(function () {
+      flash.style.transition = "opacity .4s, transform .4s";
+      flash.style.opacity = "0";
+      flash.style.transform = "translateY(-8px)";
+      setTimeout(() => flash.remove(), 400);
+    }, 6000);
+  });
+
+  /* ----------------------------------------------------- double-submit guard
+     Stops an excited kid tapping "Buy" or "Done!" three times. */
+  document.querySelectorAll("form").forEach(function (form) {
+    form.addEventListener("submit", function () {
+      const buttons = form.querySelectorAll('button[type="submit"], button:not([type])');
+      setTimeout(function () {
+        buttons.forEach(function (b) {
+          b.disabled = true;
+          b.style.opacity = ".6";
+        });
+      }, 0);
+    });
+  });
+
+  /* ----------------------------------------------------------- balance count */
+  const counter = document.querySelector("[data-count]");
+  if (counter && !reduceMotion) {
+    const target = parseInt(counter.getAttribute("data-count"), 10) || 0;
+    if (target > 0 && target < 100000) {
+      const start = performance.now();
+      const duration = Math.min(900, 260 + target * 6);
+      counter.textContent = "0";
+      requestAnimationFrame(function step(now) {
+        const t = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - t, 3);
+        counter.textContent = Math.round(target * eased).toString();
+        if (t < 1) requestAnimationFrame(step);
+      });
+    }
+  }
+
+  /* -------------------------------------------------------------- PIN pad */
+  const pinForm = document.getElementById("pinform");
+  if (pinForm) {
+    const value = document.getElementById("pin-value");
+    const dots = Array.from(document.querySelectorAll("#pin-dots span"));
+    let entered = "";
+
+    function render() {
+      value.value = entered;
+      dots.forEach(function (dot, i) {
+        dot.classList.toggle("is-on", i < entered.length);
+      });
+    }
+
+    function push(digit) {
+      if (entered.length >= 6) return;
+      entered += digit;
+      render();
+    }
+
+    document.querySelectorAll(".key[data-key]").forEach(function (key) {
+      key.addEventListener("click", function () {
+        const k = key.getAttribute("data-key");
+        if (k === "clear") { entered = ""; render(); }
+        else push(k);
+      });
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (e.key >= "0" && e.key <= "9") push(e.key);
+      else if (e.key === "Backspace") { entered = entered.slice(0, -1); render(); }
+    });
+
+    render();
+  }
+
+  /* ------------------------------------------------------------- celebrate */
+  const toast = document.querySelector("[data-celebrate]");
+  if (toast) {
+    burst();
+    setTimeout(function () {
+      toast.classList.add("is-going");
+      setTimeout(() => toast.remove(), 400);
+    }, 3600);
+  }
+
+  function burst() {
+    const canvas = document.getElementById("confetti");
+    if (!canvas || reduceMotion) return;
+
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = window.innerWidth * dpr;
+    canvas.height = window.innerHeight * dpr;
+    ctx.scale(dpr, dpr);
+    canvas.style.display = "block";
+
+    const colours = ["#7c4dff", "#ff4d94", "#12d6a0", "#28c8f5", "#ffb300", "#ff7043"];
+    const pieces = [];
+    const count = window.innerWidth < 600 ? 70 : 120;
+
+    for (let i = 0; i < count; i++) {
+      pieces.push({
+        x: window.innerWidth / 2 + (Math.random() - 0.5) * 220,
+        y: -20 - Math.random() * 120,
+        w: 7 + Math.random() * 7,
+        h: 9 + Math.random() * 9,
+        vx: (Math.random() - 0.5) * 5,
+        vy: 2.5 + Math.random() * 4,
+        spin: (Math.random() - 0.5) * 0.28,
+        angle: Math.random() * Math.PI * 2,
+        colour: colours[(Math.random() * colours.length) | 0]
+      });
+    }
+
+    const started = performance.now();
+    (function frame(now) {
+      const elapsed = now - started;
+      ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+
+      pieces.forEach(function (p) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.055;
+        p.angle += p.spin;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.globalAlpha = elapsed > 2600 ? Math.max(0, 1 - (elapsed - 2600) / 800) : 1;
+        ctx.fillStyle = p.colour;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+
+      if (elapsed < 3400) {
+        requestAnimationFrame(frame);
+      } else {
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        canvas.style.display = "none";
+      }
+    })(started);
+  }
+})();
