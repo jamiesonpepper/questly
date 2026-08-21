@@ -16,6 +16,23 @@
   <img alt="Docker" src="https://img.shields.io/badge/Docker-compose-2496ed?logo=docker&logoColor=white">
 </p>
 
+> [!NOTE]
+> ### Built with AI
+>
+> Every line of this project — the application code, the stylesheet, the icons
+> and this README — was written by **Claude** (Anthropic's Claude Opus 5)
+> running in Claude Code, to a human's direction. Every commit carries a
+> `Co-Authored-By: Claude` trailer, so the history is honest about it.
+>
+> It is not untested. `tests/smoke_test.py` walks every flow end to end against
+> a real MongoDB — awarding, spending, approving, refunding, PIN login, account
+> changes — and every screen was driven in a browser during development.
+>
+> It has **not** had a third-party security audit, and it hasn't run anywhere
+> long enough to call it battle-tested. It is a family app intended for a
+> trusted home network. Read the code before running it on anything you care
+> about, as you would with any code you find on the internet.
+
 ---
 
 Self-hosted, no accounts with anyone else, no ads, no subscriptions. It runs on
