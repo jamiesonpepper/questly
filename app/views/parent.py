@@ -12,7 +12,7 @@ from .helpers import as_int, parent_required, safe_next
 
 bp = Blueprint("parent", __name__, url_prefix="/parent")
 
-QUICK_AWARDS = [1, 5, 10, 25]
+QUICK_AWARDS = [10, 25, 50, 100]
 
 
 @bp.get("/")
