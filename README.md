@@ -50,6 +50,22 @@ web app.
 
 ---
 
+## What it looks like
+
+### For kids
+
+| Pick your face | Type your PIN | Today's quests | Spend your points |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/01-whos-here.png" alt="The who's-here screen, showing each kid as a card with their avatar and point balance" width="200"> | <img src="docs/screenshots/02-pin.png" alt="A large numeric keypad for entering a 4-6 digit PIN" width="200"> | <img src="docs/screenshots/03-kid-home.png" alt="A kid's home screen with a progress bar toward their next reward and a list of quests" width="200"> | <img src="docs/screenshots/04-shop.png" alt="The shop, showing rewards with point prices" width="200"> |
+
+### For grown-ups
+
+| Award points | Approve what's waiting | Run the quest board |
+|:---:|:---:|:---:|
+| <img src="docs/screenshots/05-award-points.png" alt="Each kid on a card with quick award buttons and a reason box" width="200"> | <img src="docs/screenshots/06-approvals.png" alt="Pending rewards to hand over and quests to check, each with approve and reject buttons" width="200"> | <img src="docs/screenshots/07-quests.png" alt="The quest board admin screen with a form for adding a quest" width="200"> |
+
+---
+
 ## Requirements
 
 Docker Engine with the Compose plugin (`docker compose`). Nothing else — Python
