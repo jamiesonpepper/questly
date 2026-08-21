@@ -72,6 +72,13 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Without these, buildx adds provenance/SBOM attestations, which turn
+          # the manifest into an OCI image index carrying unknown/unknown
+          # entries. Tools that only accept the older Docker manifest-list
+          # media type then report the tag as missing — Unraid CA's scanner
+          # among them.
+          provenance: false
+          sbom: false
 
       - name: Check the published image actually runs
         run: |
