@@ -3,8 +3,10 @@
 .claude
 .env
 .git
+.github
 .gitignore
 .venv
 README.md
 __pycache__
+docs
 venv

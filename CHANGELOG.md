@@ -9,6 +9,21 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [1.0.1] — 2026-08-21
+
+No changes to the app itself — this release exists to publish container images
+and list Questly on Unraid.
+
+### Added
+
+- Multi-architecture container images (`linux/amd64`, `linux/arm64`) published
+  automatically on every tag to GitHub Container Registry, and to Docker Hub
+  once a token is configured. The workflow smoke-tests the published image
+  before finishing.
+- `ca_profile.xml` and `templates/questly.xml` so Questly can be listed in
+  Unraid Community Applications.
+- Docs and screenshots are now excluded from the image, trimming its size.
+
 ## [1.0.0] — 2026-08-21
 
 First release.
@@ -71,5 +86,6 @@ First release.
 - CSRF protection on every mutation, and route guards keeping children out of
   grown-up pages.
 
-[Unreleased]: https://github.com/mahansford/questly/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/mahansford/questly/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/mahansford/questly/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/mahansford/questly/releases/tag/v1.0.0

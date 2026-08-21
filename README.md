@@ -66,12 +66,32 @@ web app.
 
 ---
 
+## Install on Unraid
+
+Questly is in **Community Applications** — search for *Questly* in the Apps tab.
+
+It needs a MongoDB server, which isn't bundled: install one from Community
+Applications first, then point Questly's `MONGO_URI` at it. Questly keeps no
+local state, so there's no appdata share to configure and nothing to back up
+but the database.
+
+---
+
 ## Requirements
 
 Docker Engine with the Compose plugin (`docker compose`). Nothing else — Python
 and MongoDB both run inside containers. Works on x86-64 and ARM64.
 
 ## Quick start
+
+Pre-built multi-architecture images (amd64 and arm64) are published on every
+release:
+
+```bash
+docker pull ghcr.io/mahansford/questly:latest   # or hansford909/questly:latest
+```
+
+To run the whole stack, database included:
 
 ```bash
 git clone https://github.com/mahansford/questly.git && cd questly
