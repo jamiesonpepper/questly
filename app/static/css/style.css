@@ -21,6 +21,10 @@
 
   --kid: var(--grape);
 
+  --blob-1: #c9b6ff;
+  --blob-2: #ffc2dd;
+  --blob-3: #b9f3e4;
+
   --r-xl: 32px;
   --r-lg: 24px;
   --r-md: 16px;
@@ -66,9 +70,9 @@ input, select, button, textarea { font: inherit; color: inherit; }
   filter: blur(70px);
   opacity: .40;
 }
-.blobs span:nth-child(1) { width: 46vmax; height: 46vmax; top: -18vmax; left: -12vmax; background: #c9b6ff; }
-.blobs span:nth-child(2) { width: 38vmax; height: 38vmax; top: 22vmax; right: -14vmax; background: #ffc2dd; }
-.blobs span:nth-child(3) { width: 34vmax; height: 34vmax; bottom: -16vmax; left: 22vmax; background: #b9f3e4; }
+.blobs span:nth-child(1) { width: 46vmax; height: 46vmax; top: -18vmax; left: -12vmax; background: var(--blob-1); }
+.blobs span:nth-child(2) { width: 38vmax; height: 38vmax; top: 22vmax; right: -14vmax; background: var(--blob-2); }
+.blobs span:nth-child(3) { width: 34vmax; height: 34vmax; bottom: -16vmax; left: 22vmax; background: var(--blob-3); }
 
 /* --- layout ------------------------------------------------------------- */
 .page {
@@ -683,7 +687,7 @@ p.field--full { flex: 1 1 100%; margin: 0; }
   bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   z-index: 50;
   width: min(520px, calc(100% - 24px));
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(5, 1fr);
   padding: 8px;
   border-radius: var(--r-xl);
   background: rgba(255, 255, 255, .93);
@@ -791,3 +795,120 @@ p.field--full { flex: 1 1 100%; margin: 0; }
   .decide { width: 100%; justify-content: flex-end; }
   .rowcard__actions { width: 100%; }
 }
+
+
+/* --- child-chosen themes ------------------------------------------------
+   Generated from THEMES in app/models.py. The accent is mirrored onto the
+   child's `color` field, so grown-up screens stay consistent.            */
+[data-theme="grape"] { --kid: #7c4dff; --blob-1: #c9b6ff; --blob-2: #ffc2dd; --blob-3: #b9f3e4; }
+[data-theme="bubblegum"] { --kid: #ff4d94; --blob-1: #ffc2dd; --blob-2: #ffe0b3; --blob-3: #e6c9ff; }
+[data-theme="ocean"] { --kid: #0ea5e9; --blob-1: #a5e8ff; --blob-2: #b6d8ff; --blob-3: #bff5e6; }
+[data-theme="jungle"] { --kid: #12b76a; --blob-1: #bdf0cf; --blob-2: #e2f5a9; --blob-3: #a8e6f0; }
+[data-theme="sunset"] { --kid: #f97316; --blob-1: #ffd6a5; --blob-2: #ffb3c6; --blob-3: #ffe9b0; }
+[data-theme="space"] { --kid: #6366f1; --blob-1: #c7c9ff; --blob-2: #d9c2ff; --blob-3: #a9c7ff; }
+[data-theme="dino"] { --kid: #65a30d; --blob-1: #d9f0a3; --blob-2: #c7ecc0; --blob-3: #f2e8a0; }
+[data-theme="unicorn"] { --kid: #d946ef; --blob-1: #f5c2ff; --blob-2: #c2e0ff; --blob-3: #ffe0f0; }
+
+/* --- goal tracking ------------------------------------------------------ */
+.goal__foot {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; flex-wrap: wrap;
+  font-size: .82rem; font-weight: 700; color: var(--ink-3);
+}
+.reward.is-goal { border-color: var(--kid); }
+.reward__flag {
+  align-self: flex-start;
+  padding: 3px 10px; margin-bottom: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--kid) 16%, #ffffff);
+  color: var(--kid);
+  font-size: .7rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.reward__goal { margin-top: 8px; }
+
+.linkbtn {
+  border: 0; padding: 0; background: none;
+  color: var(--ink-3);
+  font-size: .82rem; font-weight: 800;
+  text-decoration: underline; text-underline-offset: 3px;
+  cursor: pointer;
+}
+.linkbtn:hover { color: var(--kid); }
+
+/* --- theme picker ------------------------------------------------------- */
+.themepick {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.themecard {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 14px 10px;
+  border-radius: var(--r-lg);
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: transform .16s cubic-bezier(.34,1.56,.64,1), border-color .16s;
+}
+.themecard:hover { transform: translateY(-4px); }
+.themecard input { position: absolute; opacity: 0; pointer-events: none; }
+.themecard:has(input:checked), .themecard.is-on { border-color: var(--t-accent); }
+.themecard__swatch {
+  display: grid; place-items: center;
+  width: 100%; height: 74px;
+  border-radius: var(--r-md);
+  background:
+    radial-gradient(circle at 20% 25%, var(--t-a) 0 38%, transparent 39%),
+    radial-gradient(circle at 82% 30%, var(--t-b) 0 30%, transparent 31%),
+    radial-gradient(circle at 50% 88%, var(--t-c) 0 34%, transparent 35%),
+    var(--t-accent);
+}
+.themecard__emoji { font-size: 2rem; filter: drop-shadow(0 2px 4px rgba(0,0,0,.25)); }
+.themecard__name { font-family: var(--font-display); font-weight: 800; font-size: .95rem; }
+.themecard__tick {
+  position: absolute; top: 8px; right: 10px;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border-radius: 50%;
+  background: var(--t-accent); color: #fff;
+  font-size: .78rem; font-weight: 800;
+}
+
+/* --- login: remember me ------------------------------------------------- */
+.checkline {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 700; font-size: .9rem; color: var(--ink-2);
+  cursor: pointer;
+}
+.checkline input { width: 20px; height: 20px; accent-color: var(--grape); }
+
+/* --- reward stock controls ---------------------------------------------- */
+.radiorow { display: flex; flex-wrap: wrap; gap: 8px; }
+.radiorow label { cursor: pointer; }
+.radiorow input { position: absolute; opacity: 0; pointer-events: none; }
+.radiorow span {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #f4f1ff;
+  border: 2px solid transparent;
+  font-weight: 800; font-size: .85rem;
+}
+.radiorow input:checked + span { background: #fff; border-color: var(--grape); color: var(--grape); }
+.radiorow input:focus-visible + span { outline: 3px solid var(--sky); outline-offset: 2px; }
+
+.stockbox { gap: 10px; }
+.stockbox__row {
+  display: none;
+  flex-wrap: wrap; align-items: flex-end; gap: 12px;
+  padding: 12px;
+  border-radius: var(--r-md);
+  background: #faf9ff;
+}
+.stockbox__row.is-shown { display: flex; }
+.stockbox__row .card__note { flex: 1 1 100%; margin: 0; }
+.stockbox__row .field--num { flex: 0 1 170px; }

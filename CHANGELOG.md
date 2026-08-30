@@ -9,6 +9,31 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [1.1.0] — 2026-08-21
+
+### Added
+
+- **Save up for a chosen reward.** A child can pick any reward in the shop and
+  their home screen tracks progress toward that one, instead of always showing
+  whichever is closest. Deleting a reward clears it from anyone saving for it.
+- **Themes.** Eight looks — Grape, Bubblegum, Ocean, Jungle, Sunset, Space,
+  Dino and Unicorn — that children pick for themselves from a new *Look* tab.
+  Each changes their accent colour and page background, and the accent carries
+  through to how grown-ups see them.
+- **Refilling shop stock.** A reward can now be unlimited, a fixed number that
+  runs out, or an allowance that refills — "2 a day each" or "1 a month for the
+  family to share", daily, weekly or monthly, scoped per child or across
+  everyone. Allowances reset on their own, and rejecting a purchase frees the
+  slot again.
+- **Stay signed in.** Grown-ups get a "keep me signed in" tick on login, and
+  their email is remembered to save typing. The password never is, and there's
+  a "forget this email" link.
+
+### Changed
+
+- A reward form that omits the stock mode now infers it from whether a stock
+  number was supplied, rather than silently making the reward unlimited.
+
 ## [1.0.2] — 2026-08-21
 
 ### Fixed
@@ -96,7 +121,8 @@ First release.
 - CSRF protection on every mutation, and route guards keeping children out of
   grown-up pages.
 
-[Unreleased]: https://github.com/mahansford/questly/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/mahansford/questly/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/mahansford/questly/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/mahansford/questly/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/mahansford/questly/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/mahansford/questly/releases/tag/v1.0.0

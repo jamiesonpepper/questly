@@ -3,13 +3,14 @@ from flask import (Blueprint, flash, g, redirect, render_template, request,
 
 from ..db import get_db
 from ..models import (AVATARS, COLORS, PARENT_AVATARS, REPEAT_CHOICES,
-                      adjust_points, check_password,
+                      STOCK_PERIODS, STOCK_SCOPES, adjust_points, check_password,
                       create_kid, create_parent, decide_quest_claim,
                       decide_redemption, get_quest, get_reward, get_user,
                       history_for, list_kids, list_parents, list_quests,
                       list_rewards, oid, pending_claims, pending_redemptions,
                       recent_activity, redemptions_for, set_kid_pin,
-                      set_parent_password, update_parent)
+                      set_parent_password, stock_label, stock_mode,
+                      update_parent)
 from .helpers import as_int, parent_required, safe_next
 
 bp = Blueprint("parent", __name__, url_prefix="/parent")
@@ -129,12 +130,37 @@ def decide_claim_route(claim_id):
 # rewards
 # ---------------------------------------------------------------------------
 
+def _stock_fields(form, existing=None):
+    """Read the stock controls off the reward form into storable fields."""
+    mode = form.get("stock_mode")
+    if mode not in ("unlimited", "fixed", "periodic"):
+        # No explicit mode: infer from whether a plain stock number was sent,
+        # so a form without the newer controls still behaves as it used to.
+        mode = "fixed" if form.get("stock", "").strip() else "unlimited"
+
+    fields = {"stock_mode": mode, "stock": None,
+              "stock_limit": None, "stock_period": None, "stock_scope": None}
+
+    if mode == "fixed":
+        default = (existing or {}).get("stock") or 0
+        fields["stock"] = as_int(form.get("stock"), default=default, low=0, high=9999)
+    elif mode == "periodic":
+        fields["stock_limit"] = as_int(form.get("stock_limit"), default=1, low=1, high=999)
+        period = form.get("stock_period", "daily")
+        fields["stock_period"] = period if period in STOCK_PERIODS else "daily"
+        scope = form.get("stock_scope", "child")
+        fields["stock_scope"] = scope if scope in STOCK_SCOPES else "child"
+    return fields
+
+
 @bp.get("/rewards")
 @parent_required
 def rewards():
     db = get_db()
-    return render_template("parent/rewards.html",
-                           rewards=list_rewards(db, active_only=False))
+    rewards = [dict(r, stock_text=stock_label(r), mode=stock_mode(r))
+               for r in list_rewards(db, active_only=False)]
+    return render_template("parent/rewards.html", rewards=rewards,
+                           periods=STOCK_PERIODS, scopes=STOCK_SCOPES)
 
 
 @bp.post("/rewards")
@@ -146,15 +172,15 @@ def create_reward():
         flash("Give the reward a name.", "error")
         return redirect(url_for("parent.rewards"))
 
-    stock_raw = request.form.get("stock", "").strip()
-    db.rewards.insert_one({
+    doc = {
         "title": title,
         "description": request.form.get("description", "").strip()[:240],
         "emoji": (request.form.get("emoji", "").strip() or "\U0001f381")[:4],
         "cost": as_int(request.form.get("cost"), default=10, low=1, high=100000),
-        "stock": as_int(stock_raw, default=0, low=0, high=9999) if stock_raw else None,
         "active": True,
-    })
+    }
+    doc.update(_stock_fields(request.form))
+    db.rewards.insert_one(doc)
     flash(f"Added '{title}' to the shop.", "success")
     return redirect(url_for("parent.rewards"))
 
@@ -176,16 +202,19 @@ def update_reward(reward_id):
               f"{'hidden from' if reward.get('active') else 'back in'} the shop.", "info")
     elif action == "delete":
         db.rewards.delete_one({"_id": reward["_id"]})
+        # Don't leave anyone saving up for something that no longer exists.
+        db.users.update_many({"goal_reward_id": reward["_id"]},
+                             {"$set": {"goal_reward_id": None}})
         flash(f"Removed '{reward['title']}'.", "info")
     else:
-        stock_raw = request.form.get("stock", "").strip()
-        db.rewards.update_one({"_id": reward["_id"]}, {"$set": {
+        changes = {
             "title": request.form.get("title", reward["title"]).strip()[:80] or reward["title"],
             "description": request.form.get("description", "").strip()[:240],
             "emoji": (request.form.get("emoji", "").strip() or "\U0001f381")[:4],
             "cost": as_int(request.form.get("cost"), default=reward["cost"], low=1, high=100000),
-            "stock": as_int(stock_raw, default=0, low=0, high=9999) if stock_raw else None,
-        }})
+        }
+        changes.update(_stock_fields(request.form, reward))
+        db.rewards.update_one({"_id": reward["_id"]}, {"$set": changes})
         flash(f"Updated '{reward['title']}'.", "success")
     return redirect(url_for("parent.rewards"))
 

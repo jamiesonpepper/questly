@@ -33,6 +33,9 @@ If your MongoDB container is on Unraid's default bridge network, container names
 
   <License>AGPL-3.0-or-later</License>
   <Changes>
+### 1.1.0
+Saving up for a chosen reward, eight child-picked themes, refilling shop stock, and stay-signed-in for grown-ups.
+
 ### 1.0.2
 Registry compatibility fix for the published image.
 
@@ -44,8 +47,9 @@ First release.
 
   <Screenshot>https://raw.githubusercontent.com/mahansford/questly/main/docs/screenshots/03-kid-home.png</Screenshot>
   <Screenshot>https://raw.githubusercontent.com/mahansford/questly/main/docs/screenshots/04-shop.png</Screenshot>
-  <Screenshot>https://raw.githubusercontent.com/mahansford/questly/main/docs/screenshots/05-award-points.png</Screenshot>
-  <Screenshot>https://raw.githubusercontent.com/mahansford/questly/main/docs/screenshots/06-approvals.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/mahansford/questly/main/docs/screenshots/05-themes.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/mahansford/questly/main/docs/screenshots/06-award-points.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/mahansford/questly/main/docs/screenshots/07-approvals.png</Screenshot>
 
   <Config Name="WebUI Port" Target="8000" Default="37000" Mode="tcp"
           Description="Port for the Questly web interface."

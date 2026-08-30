@@ -23,18 +23,17 @@
 <div class="grid-rewards">
   {% for r in rewards %}
     {% set afford = kid.points >= r.cost %}
-    {% set soldout = r.stock is not none and r.stock <= 0 %}
-    <article class="reward {{ 'is-locked' if not afford or soldout }}">
+    {% set is_goal = goal_id and r._id == goal_id %}
+    <article class="reward {{ 'is-locked' if not afford or r.sold_out }} {{ 'is-goal' if is_goal }}">
+      {% if is_goal %}<span class="reward__flag">Saving for this</span>{% endif %}
       <div class="reward__emoji">{{ r.emoji }}</div>
       <h3 class="reward__title">{{ r.title }}</h3>
       {% if r.description %}<p class="reward__desc">{{ r.description }}</p>{% endif %}
-      {% if r.stock is not none %}
-        <p class="reward__stock">{{ r.stock }} left</p>
-      {% endif %}
+      {% if r.stock_text %}<p class="reward__stock">{{ r.stock_text }}</p>{% endif %}
       <div class="reward__foot">
         <span class="price">{{ r.cost }} &#11088;</span>
-        {% if soldout %}
-          <span class="stamp stamp--out">Sold out</span>
+        {% if r.sold_out %}
+          <span class="stamp stamp--out">All gone</span>
         {% elif afford %}
           <form method="post" action="{{ url_for('kid.buy', reward_id=r._id) }}">
             {{ csrf_field() }}
@@ -45,6 +44,16 @@
           <span class="stamp stamp--lock">{{ r.cost - kid.points }} more</span>
         {% endif %}
       </div>
+      {% if not afford and not r.sold_out %}
+        <form method="post" class="reward__goal"
+              action="{{ url_for('kid.set_goal', reward_id='clear' if is_goal else r._id) }}">
+          {{ csrf_field() }}
+          <input type="hidden" name="next" value="{{ url_for('kid.shop') }}">
+          <button class="linkbtn" type="submit">
+            {{ 'Stop saving for this' if is_goal else 'Save up for this' }}
+          </button>
+        </form>
+      {% endif %}
     </article>
   {% else %}
     <div class="empty empty--big">

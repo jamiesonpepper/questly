@@ -54,15 +54,15 @@ web app.
 
 ### For kids
 
-| Pick your face | Type your PIN | Today's quests | Spend your points |
-|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/01-whos-here.png" alt="The who's-here screen, showing each kid as a card with their avatar and point balance" width="200"> | <img src="docs/screenshots/02-pin.png" alt="A large numeric keypad for entering a 4-6 digit PIN" width="200"> | <img src="docs/screenshots/03-kid-home.png" alt="A kid's home screen with a progress bar toward their next reward and a list of quests" width="200"> | <img src="docs/screenshots/04-shop.png" alt="The shop, showing rewards with point prices" width="200"> |
+| Pick your face | Type your PIN | Save up for something | Spend your points | Choose your look |
+|:---:|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/01-whos-here.png" alt="The who's-here screen, showing each kid as a card with their avatar and point balance" width="180"> | <img src="docs/screenshots/02-pin.png" alt="A large numeric keypad for entering a 4-6 digit PIN" width="180"> | <img src="docs/screenshots/03-kid-home.png" alt="A kid's home screen tracking progress toward a chosen reward, above a list of quests" width="180"> | <img src="docs/screenshots/04-shop.png" alt="The shop, showing rewards with point prices and how many are available" width="180"> | <img src="docs/screenshots/05-themes.png" alt="A grid of colour themes a child can pick from" width="180"> |
 
 ### For grown-ups
 
-| Award points | Approve what's waiting | Run the quest board |
+| Award points | Approve what's waiting | Stock the shop |
 |:---:|:---:|:---:|
-| <img src="docs/screenshots/05-award-points.png" alt="Each kid on a card with quick award buttons and a reason box" width="200"> | <img src="docs/screenshots/06-approvals.png" alt="Pending rewards to hand over and quests to check, each with approve and reject buttons" width="200"> | <img src="docs/screenshots/07-quests.png" alt="The quest board admin screen with a form for adding a quest" width="200"> |
+| <img src="docs/screenshots/06-award-points.png" alt="Each kid on a card with quick award buttons and a reason box" width="200"> | <img src="docs/screenshots/07-approvals.png" alt="Pending rewards to hand over and quests to check, each with approve and reject buttons" width="200"> | <img src="docs/screenshots/08-shop-admin.png" alt="The reward form, showing options for how many of an item are available" width="200"> |
 
 ---
 
@@ -131,10 +131,12 @@ docker compose exec web flask --app wsgi:app seed-demo
 | --- | --- |
 | **Award points** | Quick `+10 / +25 / +50 / +100` buttons on each kid's card, or any custom amount, with an optional reason. Points can be taken away too. |
 | **Quests** | Recurring jobs (daily, weekly or one-off) worth a set number of points, assignable to specific kids or everyone. A kid taps **Done!**, you approve, the points land. |
-| **Shop** | Rewards you create, each with a point cost, an icon, a description and optional limited stock. |
+| **Shop** | Rewards you create, each with a point cost, an icon and a description. Stock can be unlimited, a fixed number that runs out, or an allowance that refills — "2 a day each" or "1 a month for the family to share". |
+| **Saving up** | A child can pick any reward to save for, and their home screen tracks progress toward it. Left alone, it shows whichever reward is closest. |
+| **Themes** | Eight colour themes children pick for themselves, changing their accent colour and background. |
 | **Buying** | Points are deducted the moment a kid buys, and the reward queues up for you to hand over. Turning a request down refunds the points automatically. |
 | **Approvals** | One page listing every quest and purchase waiting on you, with a count badge in the nav. |
-| **Accounts** | Each grown-up can change their own name, login email, icon and password. |
+| **Accounts** | Each grown-up can change their own name, login email, icon and password, and stay signed in on a trusted device. |
 | **Locked out?** | Either grown-up can set a new password for the other, confirmed with their own password. There is no email recovery, so this is the way back in. |
 
 ### The rules it enforces
@@ -146,6 +148,8 @@ docker compose exec web flask --app wsgi:app seed-demo
 - A daily quest can be claimed once per calendar day and a weekly one once per
   ISO week, both in the timezone set by `TZ`.
 - Rejecting a quest claim lets the kid try again in the same period.
+- A refilling allowance resets on its own — nothing to top up — and rejecting a
+  purchase frees its slot again.
 - Every mutation is CSRF-protected, and kids can't reach grown-up pages.
 
 ---

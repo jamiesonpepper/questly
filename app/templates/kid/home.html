@@ -6,19 +6,34 @@
 
 {% block content %}
 
-{% if next_up %}
-  {% set togo = next_up.cost - kid.points %}
-  {% set pct = (kid.points / next_up.cost * 100) | round(0, 'floor') %}
-  <section class="card goal">
+{% if goal %}
+  {% set pct = (kid.points / goal.cost * 100) | round(0, 'floor') if goal.cost else 100 %}
+  <section class="card goal {{ 'goal--ready' if goal_reached }}">
     <div class="goal__top">
-      <span class="goal__emoji">{{ next_up.emoji }}</span>
+      <span class="goal__emoji">{{ goal.emoji }}</span>
       <div class="goal__text">
-        <p class="goal__label">Next reward</p>
-        <h2 class="goal__title">{{ next_up.title }}</h2>
+        <p class="goal__label">{{ 'Saving for' if goal_chosen else 'Next reward' }}</p>
+        <h2 class="goal__title">{{ goal.title }}</h2>
       </div>
-      <span class="goal__togo">{{ togo }} to go</span>
+      {% if goal_reached %}
+        <a class="btn btn--buy btn--sm" href="{{ url_for('kid.shop') }}">Go get it!</a>
+      {% else %}
+        <span class="goal__togo">{{ goal.cost - kid.points }} to go</span>
+      {% endif %}
     </div>
-    <div class="bar"><div class="bar__fill" style="width: {{ pct }}%"></div></div>
+    <div class="bar"><div class="bar__fill" style="width: {{ [pct, 100] | min }}%"></div></div>
+    <div class="goal__foot">
+      <span>{{ kid.points }} of {{ goal.cost }} &#11088;</span>
+      {% if goal_chosen %}
+        <form method="post" action="{{ url_for('kid.set_goal', reward_id='clear') }}">
+          {{ csrf_field() }}
+          <input type="hidden" name="next" value="{{ url_for('kid.home') }}">
+          <button class="linkbtn" type="submit">Stop saving for this</button>
+        </form>
+      {% else %}
+        <a class="linkbtn" href="{{ url_for('kid.shop') }}">Pick something to save for</a>
+      {% endif %}
+    </div>
   </section>
 {% elif affordable %}
   <section class="card goal goal--ready">

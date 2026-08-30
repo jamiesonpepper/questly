@@ -96,6 +96,25 @@
     render();
   }
 
+  /* --------------------------------------------- reward stock mode rows
+     Show only the controls belonging to the selected stock mode. Works for
+     any number of reward forms on the page. */
+  document.querySelectorAll(".stockbox").forEach(function (box) {
+    const radios = box.querySelectorAll('input[name="stock_mode"]');
+    const rows = box.querySelectorAll(".stockbox__row");
+
+    function sync() {
+      const chosen = box.querySelector('input[name="stock_mode"]:checked');
+      const mode = chosen ? chosen.value : "unlimited";
+      rows.forEach(function (row) {
+        row.classList.toggle("is-shown", row.dataset.when === mode);
+      });
+    }
+
+    radios.forEach(function (r) { r.addEventListener("change", sync); });
+    sync();
+  });
+
   /* ------------------------------------------------------------- celebrate */
   const toast = document.querySelector("[data-celebrate]");
   if (toast) {

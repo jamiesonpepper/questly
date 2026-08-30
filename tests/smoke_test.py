@@ -298,6 +298,160 @@ print("\n--- a kid can't reach the account pages ---")
 check("kid blocked from /parent/account",
       kidcli.get("/parent/account", follow_redirects=False).status_code in (301, 302))
 
+print("\n--- child picks a theme ---")
+t = token(kidcli, "/me/theme")
+kidcli.post("/me/theme", data={"_csrf": t, "theme": "ocean"}, follow_redirects=True)
+with app.app_context():
+    kid = get_db().users.find_one({"_id": kid["_id"]})
+check("theme saved", kid.get("theme") == "ocean", str(kid.get("theme")))
+check("accent mirrored onto colour so grown-up views match",
+      kid.get("color") == "#0ea5e9", str(kid.get("color")))
+check("theme reaches the page", 'data-theme="ocean"' in kidcli.get("/me/").get_data(as_text=True))
+
+t = token(kidcli, "/me/theme")
+kidcli.post("/me/theme", data={"_csrf": t, "theme": "not-a-theme"}, follow_redirects=True)
+with app.app_context():
+    kid = get_db().users.find_one({"_id": kid["_id"]})
+check("a bogus theme is refused", kid.get("theme") == "ocean")
+
+print("\n--- child saves up for a chosen reward ---")
+t = token(parent, "/parent/rewards")
+parent.post("/parent/rewards", data={"_csrf": t, "title": "Big Telescope", "emoji": "\U0001f52d",
+                                     "cost": "9000", "stock_mode": "unlimited"},
+            follow_redirects=True)
+with app.app_context():
+    telescope = get_db().rewards.find_one({"title": "Big Telescope"})
+
+html = kidcli.get("/me/").get_data(as_text=True)
+check("with no goal set, home shows the cheapest unaffordable reward",
+      "Next reward" in html and "Big Telescope" not in html)
+
+t = token(kidcli, "/me/shop")
+kidcli.post(f"/me/goal/{telescope['_id']}", data={"_csrf": t}, follow_redirects=True)
+with app.app_context():
+    kid = get_db().users.find_one({"_id": kid["_id"]})
+check("goal stored on the child", kid.get("goal_reward_id") == telescope["_id"])
+html = kidcli.get("/me/").get_data(as_text=True)
+check("home now tracks the chosen reward", "Saving for" in html and "Big Telescope" in html)
+
+t = token(kidcli, "/me/shop")
+kidcli.post("/me/goal/clear", data={"_csrf": t}, follow_redirects=True)
+with app.app_context():
+    kid = get_db().users.find_one({"_id": kid["_id"]})
+check("goal cleared", kid.get("goal_reward_id") is None)
+
+t = token(kidcli, "/me/shop")
+kidcli.post(f"/me/goal/{telescope['_id']}", data={"_csrf": t}, follow_redirects=True)
+t = token(parent, "/parent/rewards")
+parent.post(f"/parent/rewards/{telescope['_id']}", data={"_csrf": t, "action": "delete"},
+            follow_redirects=True)
+with app.app_context():
+    kid = get_db().users.find_one({"_id": kid["_id"]})
+check("deleting a reward stops anyone saving for a ghost",
+      kid.get("goal_reward_id") is None)
+
+print("\n--- stock that replenishes ---")
+t = token(parent, "/parent/family")
+parent.post("/parent/family/kids", data={"_csrf": t, "name": "Sibling", "avatar": "\U0001f43c",
+                                         "color": "#28c8f5", "points": "500"},
+            follow_redirects=True)
+with app.app_context():
+    db = get_db()
+    sibling = db.users.find_one({"name": "Sibling"})
+sibcli = app.test_client()
+sibcli.get(f"/hi/{sibling['_id']}")     # no PIN, straight in
+
+t = token(parent, "/parent/")
+parent.post("/parent/award", data={"_csrf": t, "kid_id": str(kid["_id"]), "amount": "500",
+                                   "reason": "stock test"}, follow_redirects=True)
+
+t = token(parent, "/parent/rewards")
+parent.post("/parent/rewards", data={"_csrf": t, "title": "Screen Time", "emoji": "\U0001f4f1",
+                                     "cost": "5", "stock_mode": "periodic", "stock_limit": "2",
+                                     "stock_period": "daily", "stock_scope": "child"},
+            follow_redirects=True)
+parent.post("/parent/rewards", data={"_csrf": t, "title": "Family Film", "emoji": "\U0001f37f",
+                                     "cost": "5", "stock_mode": "periodic", "stock_limit": "1",
+                                     "stock_period": "weekly", "stock_scope": "family"},
+            follow_redirects=True)
+with app.app_context():
+    db = get_db()
+    screen = db.rewards.find_one({"title": "Screen Time"})
+    film = db.rewards.find_one({"title": "Family Film"})
+check("periodic reward stored", screen and screen["stock_mode"] == "periodic"
+      and screen["stock_limit"] == 2 and screen["stock_period"] == "daily")
+
+def buy(client, reward):
+    tok = token(client, "/me/shop")
+    return client.post(f"/me/shop/{reward['_id']}/buy", data={"_csrf": tok},
+                       follow_redirects=True).get_data(as_text=True)
+
+buy(kidcli, screen); buy(kidcli, screen)
+with app.app_context():
+    n = get_db().redemptions.count_documents({"reward_id": screen["_id"], "kid_id": kid["_id"]})
+check("both of the daily allowance can be bought", n == 2, str(n))
+
+buy(kidcli, screen)
+with app.app_context():
+    n = get_db().redemptions.count_documents({"reward_id": screen["_id"], "kid_id": kid["_id"]})
+check("a third is refused once the allowance is gone", n == 2, str(n))
+
+buy(sibcli, screen)
+with app.app_context():
+    n = get_db().redemptions.count_documents({"reward_id": screen["_id"], "kid_id": sibling["_id"]})
+check("per-child allowance is separate for a sibling", n == 1, str(n))
+
+buy(kidcli, film)
+buy(sibcli, film)
+with app.app_context():
+    n = get_db().redemptions.count_documents({"reward_id": film["_id"]})
+check("a whole-family allowance is shared, not per child", n == 1, str(n))
+
+with app.app_context():
+    db = get_db()
+    before = db.users.find_one({"_id": kid["_id"]})["points"]
+    red = db.redemptions.find_one({"reward_id": screen["_id"], "kid_id": kid["_id"],
+                                   "status": "pending"})
+t = token(parent, "/parent/approvals")
+parent.post(f"/parent/approvals/redemption/{red['_id']}",
+            data={"_csrf": t, "decision": "reject"}, follow_redirects=True)
+with app.app_context():
+    db = get_db()
+    after = db.users.find_one({"_id": kid["_id"]})["points"]
+check("rejecting a periodic purchase refunds the points", after == before + 5,
+      f"{before} -> {after}")
+buy(kidcli, screen)
+with app.app_context():
+    n = get_db().redemptions.count_documents({"reward_id": screen["_id"], "kid_id": kid["_id"],
+                                              "status": {"$in": ["pending", "approved"]}})
+check("...and frees the slot back up", n == 2, str(n))
+
+print("\n--- remember me ---")
+rc = app.test_client()
+t = token(rc, "/login")
+rc.post("/login", data={"_csrf": t, "email": "matt.new@example.com",
+                        "password": "brandnewpass", "remember": "1"}, follow_redirects=True)
+cookie = rc.get_cookie("questly_email")
+check("ticking remember stores the email in a cookie",
+      cookie is not None and cookie.value == "matt.new@example.com",
+      str(cookie.value if cookie else None))
+check("the password is never stored",
+      not any("brandnewpass" in (c.value or "") for c in [rc.get_cookie("questly_email")] if c))
+
+page = rc.get("/login").get_data(as_text=True)
+check("the login form is prefilled next time", 'value="matt.new@example.com"' in page)
+
+t = token(rc, "/login")
+rc.post("/forget-me", data={"_csrf": t}, follow_redirects=True)
+check("forget-me clears it", rc.get_cookie("questly_email") is None)
+
+plain = app.test_client()
+t = token(plain, "/login")
+plain.post("/login", data={"_csrf": t, "email": "matt.new@example.com",
+                           "password": "brandnewpass"}, follow_redirects=True)
+check("leaving remember unticked logs you in but stores nothing",
+      plain.get("/parent/").status_code == 200 and plain.get_cookie("questly_email") is None)
+
 print("\n--- logout ---")
 t = token(kidcli, "/me/")
 r = kidcli.post("/logout", data={"_csrf": t}, follow_redirects=False)

@@ -8,6 +8,9 @@
   <a href="{{ url_for('kid.stuff') }}" class="{{ 'is-active' if request.endpoint == 'kid.stuff' }}">
     <span class="tabbar__ico">&#127942;</span><span>My stuff</span>
   </a>
+  <a href="{{ url_for('kid.theme') }}" class="{{ 'is-active' if request.endpoint == 'kid.theme' }}">
+    <span class="tabbar__ico">&#127912;</span><span>Look</span>
+  </a>
   <form method="post" action="{{ url_for('auth.logout') }}">
     {{ csrf_field() }}
     <button type="submit"><span class="tabbar__ico">&#128075;</span><span>Bye</span></button>

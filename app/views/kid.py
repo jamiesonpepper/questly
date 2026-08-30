@@ -1,9 +1,11 @@
-from flask import (Blueprint, flash, g, redirect, render_template, session,
-                   url_for)
+from flask import (Blueprint, flash, g, redirect, render_template, request,
+                   session, url_for)
 
 from ..db import get_db
-from ..models import (claim_quest, get_quest, get_reward, history_for,
-                      list_rewards, quests_for_kid, redeem, redemptions_for)
+from ..models import (THEMES, annotate_rewards, claim_quest, get_quest,
+                      get_reward, goal_for, history_for, list_rewards,
+                      quests_for_kid, redeem, redemptions_for, set_kid_goal,
+                      set_kid_theme, theme_for)
 from .helpers import kid_required, local_now
 
 bp = Blueprint("kid", __name__, url_prefix="/me")
@@ -14,21 +16,22 @@ bp = Blueprint("kid", __name__, url_prefix="/me")
 def home():
     db = get_db()
     kid = g.user
-    quests = quests_for_kid(db, kid, local_now())
-    rewards = list_rewards(db)
+    now = local_now()
+    quests = quests_for_kid(db, kid, now)
+    rewards = annotate_rewards(db, list_rewards(db), kid, now)
 
-    # The cheapest reward they can't afford yet, to show a progress bar.
+    goal, chosen = goal_for(db, kid, rewards)
     balance = kid.get("points", 0)
-    next_up = next((r for r in rewards if r["cost"] > balance), None)
-    affordable = [r for r in rewards if r["cost"] <= balance]
 
     return render_template(
         "kid/home.html",
         kid=kid,
         quests=quests,
         open_quests=[q for q in quests if q["state"] == "open"],
-        next_up=next_up,
-        affordable=affordable,
+        goal=goal,
+        goal_chosen=chosen,
+        goal_reached=bool(goal and balance >= goal["cost"]),
+        affordable=[r for r in rewards if r["cost"] <= balance and not r["sold_out"]],
         history=history_for(db, kid["_id"], limit=8),
     )
 
@@ -40,7 +43,8 @@ def shop():
     return render_template(
         "kid/shop.html",
         kid=g.user,
-        rewards=list_rewards(db),
+        rewards=annotate_rewards(db, list_rewards(db), g.user, local_now()),
+        goal_id=g.user.get("goal_reward_id"),
         pending=[r for r in redemptions_for(db, g.user["_id"], limit=20)
                  if r["status"] == "pending"],
     )
@@ -55,7 +59,7 @@ def buy(reward_id):
         flash("That reward isn't available.", "error")
         return redirect(url_for("kid.shop"))
 
-    _, error = redeem(db, g.user, reward)
+    _, error = redeem(db, g.user, reward, local_now())
     if error:
         flash(error, "error")
     else:
@@ -83,6 +87,42 @@ def finish_quest(quest_id):
     else:
         session["celebrate"] = f"Nice one! {quest['points']} points on the way once it's checked."
     return redirect(url_for("kid.home"))
+
+
+@bp.post("/goal/<reward_id>")
+@kid_required
+def set_goal(reward_id):
+    """Save up for a particular reward. Posting 'clear' goes back to automatic."""
+    db = get_db()
+    if reward_id == "clear":
+        set_kid_goal(db, g.user["_id"], None)
+        flash("Back to showing whatever's closest.", "info")
+        return redirect(request.form.get("next") or url_for("kid.shop"))
+
+    reward = get_reward(db, reward_id)
+    if not reward or not reward.get("active"):
+        flash("That reward isn't available.", "error")
+    else:
+        set_kid_goal(db, g.user["_id"], reward["_id"])
+        flash(f"Saving up for {reward['emoji']} {reward['title']}!", "success")
+    return redirect(request.form.get("next") or url_for("kid.shop"))
+
+
+@bp.get("/theme")
+@kid_required
+def theme():
+    return render_template("kid/theme.html", kid=g.user, themes=THEMES,
+                           current=theme_for(g.user)["key"])
+
+
+@bp.post("/theme")
+@kid_required
+def choose_theme():
+    if set_kid_theme(get_db(), g.user["_id"], request.form.get("theme", "")):
+        session["celebrate"] = "Nice pick! Your colours are updated."
+    else:
+        flash("That's not one of the themes.", "error")
+    return redirect(url_for("kid.theme"))
 
 
 @bp.get("/stuff")

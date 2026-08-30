@@ -1,7 +1,7 @@
 """Domain operations. Everything that touches points goes through here so the
 ledger in `transactions` always matches the cached balance on the kid's doc."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from bson import ObjectId
 from bson.errors import InvalidId
@@ -34,6 +34,39 @@ COLORS = [
 
 REPEAT_CHOICES = ["daily", "weekly", "once"]
 
+STOCK_PERIODS = ["daily", "weekly", "monthly"]
+STOCK_SCOPES = ["child", "family"]
+
+# Each theme sets the accent colour a child sees everywhere, plus the three
+# background blobs. `accent` is mirrored onto the child's `color` field so the
+# grown-up views keep identifying them the same way.
+THEMES = [
+    {"key": "grape",      "label": "Grape",      "emoji": "\U0001f347",
+     "accent": "#7c4dff", "blobs": ("#c9b6ff", "#ffc2dd", "#b9f3e4")},
+    {"key": "bubblegum",  "label": "Bubblegum",  "emoji": "\U0001f36c",
+     "accent": "#ff4d94", "blobs": ("#ffc2dd", "#ffe0b3", "#e6c9ff")},
+    {"key": "ocean",      "label": "Ocean",      "emoji": "\U0001f30a",
+     "accent": "#0ea5e9", "blobs": ("#a5e8ff", "#b6d8ff", "#bff5e6")},
+    {"key": "jungle",     "label": "Jungle",     "emoji": "\U0001f334",
+     "accent": "#12b76a", "blobs": ("#bdf0cf", "#e2f5a9", "#a8e6f0")},
+    {"key": "sunset",     "label": "Sunset",     "emoji": "\U0001f305",
+     "accent": "#f97316", "blobs": ("#ffd6a5", "#ffb3c6", "#ffe9b0")},
+    {"key": "space",      "label": "Space",      "emoji": "\U0001f680",
+     "accent": "#6366f1", "blobs": ("#c7c9ff", "#d9c2ff", "#a9c7ff")},
+    {"key": "dino",       "label": "Dino",       "emoji": "\U0001f996",
+     "accent": "#65a30d", "blobs": ("#d9f0a3", "#c7ecc0", "#f2e8a0")},
+    {"key": "unicorn",    "label": "Unicorn",    "emoji": "\U0001f984",
+     "accent": "#d946ef", "blobs": ("#f5c2ff", "#c2e0ff", "#ffe0f0")},
+]
+
+THEMES_BY_KEY = {t["key"]: t for t in THEMES}
+DEFAULT_THEME = "grape"
+
+
+def theme_for(user):
+    """The theme a child has chosen, falling back to the default."""
+    return THEMES_BY_KEY.get((user or {}).get("theme"), THEMES_BY_KEY[DEFAULT_THEME])
+
 
 # --------------------------------------------------------------------------
 # helpers
@@ -54,13 +87,29 @@ def oid(value):
 
 
 def period_key(repeat, local_now):
-    """Which bucket a quest claim falls into, in the family's local time."""
+    """Which bucket a claim or purchase falls into, in the family's local time."""
     if repeat == "daily":
         return local_now.strftime("%Y-%m-%d")
     if repeat == "weekly":
         year, week, _ = local_now.isocalendar()
         return f"{year}-W{week:02d}"
+    if repeat == "monthly":
+        return local_now.strftime("%Y-%m")
     return "once"
+
+
+def period_started(period, local_now):
+    """The moment the current period began, as an aware UTC datetime."""
+    if period == "daily":
+        start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "weekly":
+        start = (local_now - timedelta(days=local_now.weekday())).replace(
+            hour=0, minute=0, second=0, microsecond=0)
+    elif period == "monthly":
+        start = local_now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    else:
+        return None
+    return start.astimezone(timezone.utc)
 
 
 # --------------------------------------------------------------------------
@@ -181,6 +230,39 @@ def set_parent_password(db, parent_id, password):
     return True, None
 
 
+def set_kid_theme(db, kid_id, theme_key):
+    """A child picks their own look. The accent is mirrored onto `color` so
+    grown-up screens keep identifying them consistently."""
+    theme = THEMES_BY_KEY.get(theme_key)
+    if not theme:
+        return False
+    db.users.update_one(
+        {"_id": oid(kid_id), "role": "kid"},
+        {"$set": {"theme": theme["key"], "color": theme["accent"]}},
+    )
+    return True
+
+
+def set_kid_goal(db, kid_id, reward_id):
+    """Track a particular reward, or pass None to go back to automatic."""
+    db.users.update_one(
+        {"_id": oid(kid_id), "role": "kid"},
+        {"$set": {"goal_reward_id": oid(reward_id) if reward_id else None}},
+    )
+
+
+def goal_for(db, kid, rewards):
+    """The reward a child is saving for. Their chosen one if it's still in the
+    shop, otherwise the cheapest they can't yet afford."""
+    chosen_id = kid.get("goal_reward_id")
+    if chosen_id:
+        for r in rewards:
+            if r["_id"] == chosen_id:
+                return r, True
+    balance = kid.get("points", 0)
+    return next((r for r in rewards if r["cost"] > balance), None), False
+
+
 def set_kid_pin(db, kid_id, pin):
     db.users.update_one(
         {"_id": oid(kid_id)},
@@ -259,20 +341,82 @@ def get_reward(db, reward_id):
     return db.rewards.find_one({"_id": _id}) if _id else None
 
 
-def redeem(db, kid, reward):
+def stock_mode(reward):
+    """Normalised stock mode, tolerating rewards created before periodic
+    stock existed (they only ever had a plain `stock` number or None)."""
+    mode = reward.get("stock_mode")
+    if mode in ("unlimited", "fixed", "periodic"):
+        return mode
+    return "unlimited" if reward.get("stock") is None else "fixed"
+
+
+def stock_used(db, reward, kid, local_now):
+    """How many of this reward's periodic allowance have already gone."""
+    since = period_started(reward.get("stock_period", "daily"), local_now)
+    query = {
+        "reward_id": reward["_id"],
+        "status": {"$in": ["pending", "approved"]},
+        "created_at": {"$gte": since},
+    }
+    if reward.get("stock_scope", "child") == "child" and kid:
+        query["kid_id"] = kid["_id"]
+    return db.redemptions.count_documents(query)
+
+
+def stock_left(db, reward, kid, local_now):
+    """How many are still available, or None when unlimited."""
+    mode = stock_mode(reward)
+    if mode == "unlimited":
+        return None
+    if mode == "fixed":
+        return max(0, int(reward.get("stock") or 0))
+    limit = int(reward.get("stock_limit") or 0)
+    return max(0, limit - stock_used(db, reward, kid, local_now))
+
+
+def stock_label(reward):
+    """Human wording for the shop and admin lists."""
+    mode = stock_mode(reward)
+    if mode == "unlimited":
+        return None
+    if mode == "fixed":
+        return f"{int(reward.get('stock') or 0)} left"
+    per = {"daily": "a day", "weekly": "a week", "monthly": "a month"}.get(
+        reward.get("stock_period", "daily"), "a day")
+    who = "each" if reward.get("stock_scope", "child") == "child" else "to share"
+    return f"{int(reward.get('stock_limit') or 0)} {per} {who}"
+
+
+def annotate_rewards(db, rewards, kid, local_now):
+    """Attach `left` and `label` so templates don't run queries."""
+    out = []
+    for r in rewards:
+        r = dict(r)
+        r["left"] = stock_left(db, r, kid, local_now)
+        r["stock_text"] = stock_label(r)
+        r["sold_out"] = r["left"] is not None and r["left"] <= 0
+        out.append(r)
+    return out
+
+
+def redeem(db, kid, reward, local_now=None):
     """Take the points immediately and queue the reward for parent approval.
     Returns (redemption, error_message)."""
     cost = int(reward["cost"])
-    limited = reward.get("stock") is not None
+    mode = stock_mode(reward)
+    local_now = local_now or datetime.now(timezone.utc)
 
-    # Claim the item off the shelf first, conditionally, so two kids racing for
-    # the last one can't both win it.
-    if limited:
+    # Claim a fixed item off the shelf first, conditionally, so two kids racing
+    # for the last one can't both win it.
+    if mode == "fixed":
         claimed = db.rewards.find_one_and_update(
             {"_id": reward["_id"], "stock": {"$gt": 0}}, {"$inc": {"stock": -1}}
         )
         if not claimed:
             return None, "That one is sold out for now."
+    elif mode == "periodic":
+        if stock_left(db, reward, kid, local_now) <= 0:
+            return None, _periodic_sold_out(reward)
 
     # Same trick for the points: only succeeds if the kid can actually afford
     # it, so two fast taps can never overdraw the balance.
@@ -282,7 +426,7 @@ def redeem(db, kid, reward):
         return_document=True,
     )
     if not updated:
-        if limited:  # couldn't pay after all — put it back on the shelf
+        if mode == "fixed":  # couldn't pay after all — put it back on the shelf
             db.rewards.update_one({"_id": reward["_id"]}, {"$inc": {"stock": 1}})
         return None, "Not enough points for that yet — keep going!"
 
@@ -301,6 +445,15 @@ def redeem(db, kid, reward):
     }
     doc["_id"] = db.redemptions.insert_one(doc).inserted_id
 
+    # A counted allowance can't be claimed atomically, so verify afterwards and
+    # unwind if two purchases landed at once.
+    if mode == "periodic":
+        limit = int(reward.get("stock_limit") or 0)
+        if stock_used(db, reward, kid, local_now) > limit:
+            db.redemptions.delete_one({"_id": doc["_id"]})
+            db.users.update_one({"_id": kid["_id"]}, {"$inc": {"points": cost}})
+            return None, _periodic_sold_out(reward)
+
     db.transactions.insert_one({
         "kid_id": kid["_id"],
         "kid_name": kid["name"],
@@ -313,6 +466,14 @@ def redeem(db, kid, reward):
         "created_at": now(),
     })
     return doc, None
+
+
+def _periodic_sold_out(reward):
+    per = {"daily": "today", "weekly": "this week", "monthly": "this month"}.get(
+        reward.get("stock_period", "daily"), "right now")
+    if reward.get("stock_scope", "child") == "family":
+        return f"All gone {per} — someone got there first!"
+    return f"You've had all of those {per}. Try again soon!"
 
 
 def decide_redemption(db, redemption_id, approve, actor):
@@ -338,11 +499,11 @@ def decide_redemption(db, redemption_id, approve, actor):
             db, red["kid_id"], red["cost"],
             f"Refund for {red['reward_title']}", actor, kind="refund",
         )
-        if red.get("reward_id"):
-            db.rewards.update_one(
-                {"_id": red["reward_id"], "stock": {"$ne": None}},
-                {"$inc": {"stock": 1}},
-            )
+        # Only fixed stock needs putting back; a periodic allowance frees up
+        # on its own because rejected redemptions stop being counted.
+        reward = db.rewards.find_one({"_id": red.get("reward_id")})
+        if reward and stock_mode(reward) == "fixed":
+            db.rewards.update_one({"_id": reward["_id"]}, {"$inc": {"stock": 1}})
     return red
 
 

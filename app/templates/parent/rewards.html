@@ -23,14 +23,50 @@
       <span>Cost</span>
       <input name="cost" type="number" min="1" max="100000" value="20" inputmode="numeric" required>
     </label>
-    <label class="field field--num">
-      <span>Stock</span>
-      <input name="stock" type="number" min="0" max="9999" placeholder="&#8734;" inputmode="numeric">
-    </label>
     <label class="field field--full">
       <span>Description <em>(optional)</em></span>
       <input name="description" maxlength="240" placeholder="30 minutes, your choice of device">
     </label>
+    <fieldset class="field field--full stockbox">
+      <span>How many are available?</span>
+      <div class="radiorow">
+        <label><input type="radio" name="stock_mode" value="unlimited" checked><span>Unlimited</span></label>
+        <label><input type="radio" name="stock_mode" value="fixed" ><span>A fixed number</span></label>
+        <label><input type="radio" name="stock_mode" value="periodic" ><span>Some every day/week</span></label>
+      </div>
+
+      <div class="stockbox__row" data-when="fixed">
+        <label class="field field--num">
+          <span>Total available</span>
+          <input type="number" name="stock" min="0" max="9999" value="1">
+        </label>
+        <p class="card__note">Counts down as they're bought, and doesn't come back.</p>
+      </div>
+
+      <div class="stockbox__row" data-when="periodic">
+        <label class="field field--num">
+          <span>How many</span>
+          <input type="number" name="stock_limit" min="1" max="999" value="1">
+        </label>
+        <label class="field field--num">
+          <span>Every</span>
+          <select name="stock_period">
+            <option value="daily" >Day</option>
+            <option value="weekly" >Week</option>
+            <option value="monthly" >Month</option>
+          </select>
+        </label>
+        <label class="field field--num">
+          <span>For</span>
+          <select name="stock_scope">
+            <option value="child" >Each child</option>
+            <option value="family" >The whole family to share</option>
+          </select>
+        </label>
+        <p class="card__note">Resets on its own — nothing to top up.</p>
+      </div>
+    </fieldset>
+
     <button class="btn btn--primary" type="submit">Add to shop</button>
   </form>
 </section>
@@ -43,7 +79,7 @@
         <span class="rowcard__title">
           {{ r.title }}
           {% if not r.active %}<em class="tag">hidden</em>{% endif %}
-          {% if r.stock is not none %}<em class="tag">{{ r.stock }} left</em>{% endif %}
+          {% if r.stock_text %}<em class="tag">{{ r.stock_text }}</em>{% endif %}
         </span>
         <span class="price">{{ r.cost }} &#11088;</span>
         <span class="rowcard__chev">&#9662;</span>
@@ -63,15 +99,50 @@
           <span>Cost</span>
           <input name="cost" type="number" min="1" max="100000" value="{{ r.cost }}" required>
         </label>
-        <label class="field field--num">
-          <span>Stock</span>
-          <input name="stock" type="number" min="0" max="9999"
-                 value="{{ r.stock if r.stock is not none else '' }}" placeholder="&#8734;">
-        </label>
         <label class="field field--full">
           <span>Description</span>
           <input name="description" value="{{ r.description or '' }}" maxlength="240">
         </label>
+    <fieldset class="field field--full stockbox">
+      <span>How many are available?</span>
+      <div class="radiorow">
+        <label><input type="radio" name="stock_mode" value="unlimited" {{ 'checked' if r.mode == 'unlimited' }}><span>Unlimited</span></label>
+        <label><input type="radio" name="stock_mode" value="fixed" {{ 'checked' if r.mode == 'fixed' }}><span>A fixed number</span></label>
+        <label><input type="radio" name="stock_mode" value="periodic" {{ 'checked' if r.mode == 'periodic' }}><span>Some every day/week</span></label>
+      </div>
+
+      <div class="stockbox__row" data-when="fixed">
+        <label class="field field--num">
+          <span>Total available</span>
+          <input type="number" name="stock" min="0" max="9999" value="{{ r.stock or 1 }}">
+        </label>
+        <p class="card__note">Counts down as they're bought, and doesn't come back.</p>
+      </div>
+
+      <div class="stockbox__row" data-when="periodic">
+        <label class="field field--num">
+          <span>How many</span>
+          <input type="number" name="stock_limit" min="1" max="999" value="{{ r.stock_limit or 1 }}">
+        </label>
+        <label class="field field--num">
+          <span>Every</span>
+          <select name="stock_period">
+            <option value="daily" {{ 'selected' if r.stock_period == 'daily' }}>Day</option>
+            <option value="weekly" {{ 'selected' if r.stock_period == 'weekly' }}>Week</option>
+            <option value="monthly" {{ 'selected' if r.stock_period == 'monthly' }}>Month</option>
+          </select>
+        </label>
+        <label class="field field--num">
+          <span>For</span>
+          <select name="stock_scope">
+            <option value="child" {{ 'selected' if r.stock_scope == 'child' }}>Each child</option>
+            <option value="family" {{ 'selected' if r.stock_scope == 'family' }}>The whole family to share</option>
+          </select>
+        </label>
+        <p class="card__note">Resets on its own — nothing to top up.</p>
+      </div>
+    </fieldset>
+
         <div class="rowcard__actions">
           <button class="btn btn--primary btn--sm" type="submit" name="action" value="save">Save</button>
           <button class="btn btn--ghost btn--sm" type="submit" name="action" value="toggle">

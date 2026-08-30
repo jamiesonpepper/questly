@@ -22,7 +22,8 @@
   <meta name="apple-mobile-web-app-title" content="Questly">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% block body_class %}{% endblock %}"
+      {% if current_user and current_user.role == 'kid' %}data-theme="{{ current_user.theme or 'grape' }}"{% endif %}>
   <div class="blobs" aria-hidden="true"><span></span><span></span><span></span></div>
 
   {% block chrome %}{% include 'partials/topbar.html' %}{% endblock %}
