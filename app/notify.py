@@ -68,14 +68,42 @@ def _send_ntfy(cfg, title, body):
 
 
 def _send_signal(cfg, title, body):
-    # Signal has no public API; this talks to a self-hosted signal-cli-rest-api.
+    """Signal has no public API; this talks to a self-hosted
+    signal-cli-rest-api. Recipients may be phone numbers or `group.<id>`."""
     api = (cfg.get("api_url") or "").rstrip("/")
     recipients = [r.strip() for r in (cfg.get("recipients") or "").split(",") if r.strip()]
     return _post(f"{api}/v2/send", {
-        "message": f"{title}\n{body}",
+        # Signal's own emphasis syntax; the bridge renders it when styled.
+        "message": f"*{title}*\n{body}",
         "number": cfg.get("number"),
         "recipients": recipients,
+        "text_mode": "styled",
     })
+
+
+def signal_groups(api_url, number):
+    """Ask the bridge which groups this number is in, so a grown-up can pick
+    one instead of hunting for a base64 group id. Returns (groups, error)."""
+    api = (api_url or "").rstrip("/")
+    if not api or not number:
+        return [], "Fill in the bridge URL and your Signal number first."
+    url = f"{api}/v1/groups/{urllib.parse.quote(number)}"
+    try:
+        req = urllib.request.Request(url, method="GET")
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            data = json.loads(r.read().decode() or "[]")
+    except urllib.error.HTTPError as exc:
+        return [], f"The bridge said HTTP {exc.code}. Is that number registered?"
+    except urllib.error.URLError as exc:
+        return [], f"Couldn't reach the bridge: {exc.reason}"
+    except Exception as exc:                                # noqa: BLE001
+        return [], str(exc)
+
+    groups = [{"id": g.get("id"), "name": g.get("name") or "(unnamed group)"}
+              for g in data if g.get("id")]
+    if not groups:
+        return [], "That number isn't in any groups the bridge can see."
+    return sorted(groups, key=lambda g: g["name"].lower()), None
 
 
 def _send_gotify(cfg, title, body):
@@ -123,7 +151,7 @@ CHANNELS = {
         "fields": [
             ("api_url",    "Bridge URL", "text", True, "http://192.168.1.50:8080", "Where signal-cli-rest-api is listening."),
             ("number",     "Send from",  "text", True, "+447700900000", "The registered Signal number, in international format."),
-            ("recipients", "Send to",    "text", True, "+447700900001", "Comma-separated numbers, or group.<id> for a group."),
+            ("recipients", "Send to",    "text", True, "+447700900001", "Phone numbers and/or group ids, comma-separated. Use Find my groups to pick one."),
         ],
     },
     "gotify": {
@@ -205,6 +233,15 @@ def _deliver_quietly(channel, title, body):
     ok, detail = deliver(channel, title, body)
     if not ok:
         log.warning("notification via %s failed: %s", channel.get("type"), detail)
+
+
+def compose(*lines):
+    """Join the non-empty lines of a message body.
+
+    Kept deliberately plain: ntfy, Gotify and Telegram show it as-is, while
+    Signal and Discord add their own emphasis to the title around it.
+    """
+    return "\n".join(str(l) for l in lines if l)
 
 
 def notify(db, user, event, title, body, url=None):

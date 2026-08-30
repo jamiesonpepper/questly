@@ -979,3 +979,17 @@ p.field--full { flex: 1 1 100%; margin: 0; }
 .chanfields.is-shown { display: block; }
 .chanfields .formgrid { margin-top: 8px; }
 .hint { color: var(--ink-3); font-size: .76rem; font-weight: 600; line-height: 1.35; }
+
+.grouppick { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.grouppick__list { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.groupchip {
+  padding: 7px 13px;
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-weight: 800; font-size: .85rem;
+  cursor: pointer;
+}
+.groupchip:hover { border-color: var(--grape); color: var(--grape); }
+.groupchip.is-added { background: rgba(18, 214, 160, .16); border-color: transparent; color: #0a8b68; }
+.groupchip.is-added::after { content: " \2713"; }

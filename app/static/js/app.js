@@ -136,6 +136,65 @@
     sync();
   });
 
+  /* -------------------------------------------------- Signal group picker
+     Group ids are long base64 strings; ask the bridge and let people click. */
+  document.querySelectorAll(".grouppick").forEach(function (box) {
+    const button = box.querySelector("[data-find-groups]");
+    const status = box.querySelector("[data-groups-status]");
+    const list = box.querySelector("[data-groups-list]");
+    const fields = box.closest(".chanfields");
+
+    function field(name) {
+      return fields.querySelector('[name="signal__' + name + '"]');
+    }
+
+    button.addEventListener("click", async function () {
+      status.textContent = "Asking the bridge\u2026";
+      list.hidden = true;
+      list.innerHTML = "";
+
+      const body = new URLSearchParams({
+        api_url: field("api_url").value.trim(),
+        number: field("number").value.trim()
+      });
+
+      let data;
+      try {
+        const res = await fetch(box.dataset.groupsUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-CSRF-Token": document.querySelector('[name="_csrf"]').value
+          },
+          body: body
+        });
+        data = await res.json();
+      } catch (err) {
+        status.textContent = "Couldn't ask the bridge — is the URL right?";
+        return;
+      }
+
+      if (data.error) { status.textContent = data.error; return; }
+
+      status.textContent = "Tap one to add it:";
+      data.groups.forEach(function (g) {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "groupchip";
+        chip.textContent = g.name;
+        chip.addEventListener("click", function () {
+          const input = field("recipients");
+          const have = input.value.split(",").map(s => s.trim()).filter(Boolean);
+          if (!have.includes(g.id)) have.push(g.id);
+          input.value = have.join(", ");
+          chip.classList.add("is-added");
+        });
+        list.appendChild(chip);
+      });
+      list.hidden = false;
+    });
+  });
+
   /* ------------------------------------------------------------- celebrate */
   const toast = document.querySelector("[data-celebrate]");
   if (toast) {

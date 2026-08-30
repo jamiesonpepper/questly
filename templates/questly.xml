@@ -33,6 +33,9 @@ If your MongoDB container is on Unraid's default bridge network, container names
 
   <License>AGPL-3.0-or-later</License>
   <Changes>
+### 1.3.0
+Signal group chats, formatted Signal messages, and far more detail in every notification.
+
 ### 1.2.0
 In-app notifications, plus per-person delivery via ntfy, Signal, Gotify, Telegram, Discord, Pushover or a webhook.
 

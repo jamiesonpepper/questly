@@ -50,6 +50,15 @@
             </label>
           {% endfor %}
         </div>
+        {% if key == 'signal' %}
+          <div class="grouppick" data-groups-url="{{ url_for('parent.lookup_signal_groups') }}">
+            <button type="button" class="btn btn--ghost btn--sm" data-find-groups>
+              Find my groups
+            </button>
+            <span class="hint" data-groups-status></span>
+            <div class="grouppick__list" data-groups-list hidden></div>
+          </div>
+        {% endif %}
       </div>
     {% endfor %}
 

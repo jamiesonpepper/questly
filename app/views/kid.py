@@ -6,8 +6,8 @@ from ..models import (THEMES, annotate_rewards, claim_quest, get_quest,
                       get_reward, goal_for, history_for, list_rewards,
                       quests_for_kid, redeem, redemptions_for, set_kid_goal,
                       set_kid_theme, theme_for)
-from ..models import list_parents
-from ..notify import mark_all_read, notify_many, recent
+from ..models import get_user, list_parents
+from ..notify import compose, mark_all_read, notify_many, recent
 from .helpers import kid_required, local_now
 
 bp = Blueprint("kid", __name__, url_prefix="/me")
@@ -65,9 +65,16 @@ def buy(reward_id):
     if error:
         flash(error, "error")
     else:
-        notify_many(db, list_parents(db), "approval_waiting",
-                    f"{g.user['name']} bought {reward['title']}",
-                    f"{reward['cost']} points spent. It needs handing over.")
+        left = (get_user(db, g.user["_id"]) or {}).get("points", 0)
+        notify_many(
+            db, list_parents(db), "approval_waiting",
+            f"{reward.get('emoji', '')} {g.user['name']} bought {reward['title']}".strip(),
+            compose(
+                f"Cost: {reward['cost']} points",
+                f"{g.user['name']} now has {left} points left",
+                reward.get("description"),
+                "Hand it over, then mark it Given in Questly.",
+            ))
         session["celebrate"] = f"You got {reward['title']}! Ask a grown-up to hand it over."
     return redirect(url_for("kid.shop"))
 
@@ -90,9 +97,15 @@ def finish_quest(quest_id):
     if error:
         flash(error, "warn")
     else:
-        notify_many(db, list_parents(db), "approval_waiting",
-                    f"{g.user['name']} finished {quest['title']}",
-                    f"Worth {quest['points']} points once you approve it.")
+        notify_many(
+            db, list_parents(db), "approval_waiting",
+            f"{quest.get('emoji', '')} {g.user['name']} finished {quest['title']}".strip(),
+            compose(
+                f"Quest: {quest['title']} ({quest.get('repeat', 'daily')})",
+                f"Worth {quest['points']} points",
+                f"{g.user['name']} has {g.user.get('points', 0)} points right now",
+                "Approve it in Questly to pay out.",
+            ))
         session["celebrate"] = f"Nice one! {quest['points']} points on the way once it's checked."
     return redirect(url_for("kid.home"))
 

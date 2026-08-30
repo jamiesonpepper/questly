@@ -169,7 +169,7 @@ grown-up under *Family* (for a child) or *My account* (for themselves):
 | Channel | Notes |
 | --- | --- |
 | **ntfy** | Free push to a phone or tablet. Best fit for children — they subscribe to a topic, no account needed. Use the public `ntfy.sh` or your own server. |
-| **Signal** | Signal has no public API, so this posts to a self-hosted [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) bridge, which is itself in Unraid Community Apps. |
+| **Signal** | Signal has no public API, so this posts to a self-hosted [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) bridge, which is itself in Unraid Community Apps. Sends to individuals **or a group chat** — hit *Find my groups* and pick one rather than hunting for its id. Messages use Signal's own formatting, so titles arrive in bold. |
 | **Gotify** | Self-hosted push server with Android and web clients. |
 | **Telegram** | Via a bot you create with @BotFather. |
 | **Discord** | Posts into a channel through a webhook. |
@@ -178,6 +178,11 @@ grown-up under *Family* (for a child) or *My account* (for themselves):
 
 Each channel can be limited to particular kinds of update, and there's a
 **Test** button that sends a message immediately so you know it works.
+
+Messages carry the detail you need to act without opening the app. A purchase
+tells you which child bought what, the cost, what they have left, the item's
+description and what to do next; a finished quest tells you which child, which
+quest, how often it repeats and what it pays.
 
 Sends happen on a background thread, so a slow or unreachable endpoint never
 holds up the app, and a failure is logged rather than shown to a child.

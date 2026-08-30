@@ -603,6 +603,62 @@ with app.app_context():
     owner = get_db().users.find_one({"_id": me["_id"]})
 check("channel removed", not owner.get("channels"))
 
+print("\n--- signal groups and message shape ---")
+from app.notify import compose, signal_groups
+
+groups, err = signal_groups("http://127.0.0.1:9", "+440000000000")
+check("an unreachable bridge is reported, not raised", groups == [] and bool(err))
+groups, err = signal_groups("", "")
+check("missing bridge details are caught before calling", "Fill in" in (err or ""))
+
+t = token(parent, "/parent/account")
+r = parent.post("/parent/signal/groups",
+                data={"_csrf": t, "api_url": "http://127.0.0.1:9", "number": "+440000000000"})
+check("the group lookup endpoint answers with JSON",
+      r.status_code == 200 and r.get_json().get("error"))
+r = app.test_client().post("/parent/signal/groups", data={"api_url": "x", "number": "y"})
+check("...and is not open to anyone logged out", r.status_code in (301, 302, 400))
+
+check("compose drops empty lines",
+      compose("a", None, "", "b") == "a\nb")
+
+# a purchase notification should carry the detail a grown-up needs
+with app.app_context():
+    db = get_db()
+    db.notifications.delete_many({})
+    db.rewards.update_one({"title": "Sticker"},
+                          {"$set": {"description": "One shiny sticker"}})
+    sticker = db.rewards.find_one({"title": "Sticker"})
+t = token(kidcli, "/me/shop")
+kidcli.post(f"/me/shop/{sticker['_id']}/buy", data={"_csrf": t}, follow_redirects=True)
+with app.app_context():
+    n = get_db().notifications.find_one({"event": "approval_waiting"})
+check("purchase alert names the child and the item",
+      n and "Ava" in n["title"] and "Sticker" in n["title"], (n or {}).get("title"))
+check("purchase alert gives cost, balance, description and what to do",
+      n and all(x in n["body"] for x in ["Cost:", "points left", "One shiny sticker", "Given"]),
+      (n or {}).get("body", "").replace("\n", " | "))
+
+# and a quest completion should say which child did which quest. Use a fresh
+# quest — the daily ones this child has already claimed today would be refused.
+t = token(parent, "/parent/quests")
+parent.post("/parent/quests", data={"_csrf": t, "title": "Feed the cat",
+                                    "emoji": "\U0001f431", "points": "5",
+                                    "repeat": "daily"}, follow_redirects=True)
+with app.app_context():
+    db = get_db()
+    db.notifications.delete_many({})
+    quest2 = db.quests.find_one({"title": "Feed the cat"})
+t = token(kidcli, "/me/")
+kidcli.post(f"/me/quests/{quest2['_id']}/done", data={"_csrf": t}, follow_redirects=True)
+with app.app_context():
+    n = get_db().notifications.find_one({"event": "approval_waiting"})
+check("quest alert names the child and the quest",
+      n and "Ava" in n["title"] and "Feed the cat" in n["title"], (n or {}).get("title"))
+check("quest alert gives the points and how to pay out",
+      n and "Worth 5 points" in n["body"] and "Approve" in n["body"],
+      (n or {}).get("body", "").replace("\n", " | "))
+
 print("\n--- logout ---")
 t = token(kidcli, "/me/")
 r = kidcli.post("/logout", data={"_csrf": t}, follow_redirects=False)

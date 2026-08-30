@@ -9,6 +9,26 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [1.3.0] — 2026-08-30
+
+### Added
+
+- **Signal group chats.** A Signal channel can send to a group as well as to
+  individuals. Because group ids are long base64 strings, there's a *Find my
+  groups* button that asks the bridge which groups your number is in and lets
+  you pick one by name.
+- **Signal messages are formatted.** Sent with `text_mode: styled`, so the
+  title arrives in bold rather than as a run-on line.
+
+### Changed
+
+- **Notifications carry the detail needed to act on them.** A purchase alert
+  now names the child and item and gives the cost, the child's remaining
+  balance, the item's description and what to do next. A finished-quest alert
+  names the child and quest and gives how often it repeats, what it pays and
+  the child's current balance. Points, approvals and new shop items gained
+  similar context.
+
 ## [1.2.0] — 2026-08-30
 
 ### Added
@@ -148,7 +168,8 @@ First release.
 - CSRF protection on every mutation, and route guards keeping children out of
   grown-up pages.
 
-[Unreleased]: https://github.com/mahansford/questly/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/mahansford/questly/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/mahansford/questly/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/mahansford/questly/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mahansford/questly/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/mahansford/questly/compare/v1.0.1...v1.0.2

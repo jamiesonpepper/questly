@@ -1,5 +1,5 @@
-from flask import (Blueprint, flash, g, redirect, render_template, request,
-                   url_for)
+from flask import (Blueprint, flash, g, jsonify, redirect, render_template,
+                   request, url_for)
 
 from ..db import get_db
 from ..models import (AVATARS, COLORS, PARENT_AVATARS, REPEAT_CHOICES,
@@ -12,7 +12,8 @@ from ..models import (AVATARS, COLORS, PARENT_AVATARS, REPEAT_CHOICES,
                       add_channel, get_channel, remove_channel,
                       set_parent_password, stock_label, stock_mode,
                       update_parent)
-from ..notify import (CHANNELS, channel_summary, deliver,
+from ..notify import (CHANNELS, channel_summary, compose, deliver,
+                      signal_groups,
                       events_for, mark_all_read, notify, notify_many,
                       recent)
 from .helpers import as_int, check_goal_reached, parent_required, safe_next
@@ -63,8 +64,10 @@ def award():
         flash("Couldn't find that child.", "error")
     else:
         if amount > 0:
-            notify(db, kid, "points_awarded", f"You got {amount} points!",
-                   reason or f"{g.user['name']} awarded you {amount} points.")
+            notify(db, kid, "points_awarded", f"⭐ You got {amount} points!",
+                   compose(reason and f"For: {reason}",
+                           f"From {g.user['name']}",
+                           f"You now have {kid.get('points', 0)} points"))
             check_goal_reached(db, kid["_id"])
         verb = "Gave" if amount > 0 else "Took"
         flash(f"{verb} {abs(amount)} points {'to' if amount > 0 else 'from'} {kid['name']}.",
@@ -115,7 +118,8 @@ def decide_redemption_route(redemption_id):
     elif approve:
         notify(get_db(), red["kid_id"], "purchase_approved",
                f"{red['reward_emoji']} {red['reward_title']} is yours!",
-               "A grown-up has handed it over. Enjoy!")
+               compose(f"{g.user['name']} has handed it over. Enjoy!",
+                       f"It cost you {red['cost']} points."))
         flash(f"Marked '{red['reward_title']}' as handed over to {red['kid_name']}.", "success")
     else:
         db = get_db()
@@ -138,7 +142,8 @@ def decide_claim_route(claim_id):
         db = get_db()
         notify(db, claim["kid_id"], "quest_approved",
                f"{claim['quest_emoji']} {claim['quest_title']} approved!",
-               f"You earned {claim['points']} points.")
+               compose(f"You earned {claim['points']} points.",
+                       f"Approved by {g.user['name']}."))
         check_goal_reached(db, claim["kid_id"])
         flash(f"{claim['kid_name']} earned {claim['points']} points for "
               f"'{claim['quest_title']}'.", "success")
@@ -206,8 +211,10 @@ def create_reward():
     doc.update(_stock_fields(request.form))
     db.rewards.insert_one(doc)
     notify_many(db, list_kids(db), "shop_new",
-                f"New in the shop: {title}",
-                f"{doc['emoji']} {title} — {doc['cost']} points.")
+                f"{doc['emoji']} New in the shop: {title}",
+                compose(f"Costs {doc['cost']} points",
+                        doc.get("description"),
+                        stock_label(doc) and f"Available: {stock_label(doc)}"))
     flash(f"Added '{title}' to the shop.", "success")
     return redirect(url_for("parent.rewards"))
 
@@ -441,6 +448,16 @@ def _owner_redirect(owner):
     if owner["role"] == "kid":
         return redirect(url_for("parent.family") + f"#kid-{owner['_id']}")
     return redirect(url_for("parent.account"))
+
+
+@bp.post("/signal/groups")
+@parent_required
+def lookup_signal_groups():
+    """Ask a Signal bridge which groups a number belongs to, so the group id
+    can be picked from a list rather than copied by hand."""
+    groups, error = signal_groups(request.form.get("api_url", "").strip(),
+                                  request.form.get("number", "").strip())
+    return jsonify(groups=groups, error=error)
 
 
 @bp.post("/channels/<owner_id>")
