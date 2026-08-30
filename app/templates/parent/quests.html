@@ -9,7 +9,9 @@
 
 <section class="card card--form">
   <h2 class="card__title">Add a quest</h2>
-  <p class="card__note">Kids tap "Done!" and you approve it — points land after that.</p>
+  <p class="card__note">Kids tap "Done!" and you approve it — points land after that.
+    Set <strong>Times each</strong> above 1 for something worth doing more than once,
+    like a tidy-up round.</p>
   <form method="post" action="{{ url_for('parent.create_quest') }}" class="formgrid">
     {{ csrf_field() }}
     <label class="field field--emoji">
@@ -29,6 +31,10 @@
       <select name="repeat">
         {% for r in repeats %}<option value="{{ r }}">{{ r | capitalize }}</option>{% endfor %}
       </select>
+    </label>
+    <label class="field field--num">
+      <span>Times each</span>
+      <input name="times_per_period" type="number" min="1" max="20" value="1" inputmode="numeric">
     </label>
     <fieldset class="field field--full">
       <span>Who's it for? <em>(nobody ticked = everyone)</em></span>
@@ -52,7 +58,7 @@
         <span class="rowcard__emoji">{{ q.emoji }}</span>
         <span class="rowcard__title">
           {{ q.title }}
-          <em class="tag">{{ q.repeat }}</em>
+          <em class="tag">{{ (q.times_per_period or 1) ~ "× " if (q.times_per_period or 1) > 1 }}{{ q.repeat }}</em>
           {% if not q.active %}<em class="tag">paused</em>{% endif %}
           {% if q.assigned_to %}
             <em class="tag">{{ q.assigned_to | length }} kid{{ '' if q.assigned_to|length == 1 else 's' }}</em>
@@ -83,6 +89,11 @@
               <option value="{{ r }}" {{ 'selected' if q.repeat == r }}>{{ r | capitalize }}</option>
             {% endfor %}
           </select>
+        </label>
+        <label class="field field--num">
+          <span>Times each</span>
+          <input name="times_per_period" type="number" min="1" max="20"
+                 value="{{ q.times_per_period or 1 }}" inputmode="numeric">
         </label>
         <fieldset class="field field--full">
           <span>Who's it for?</span>

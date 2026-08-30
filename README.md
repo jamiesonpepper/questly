@@ -130,7 +130,7 @@ docker compose exec web flask --app wsgi:app seed-demo
 | Thing | What happens |
 | --- | --- |
 | **Award points** | Quick `+10 / +25 / +50 / +100` buttons on each kid's card, or any custom amount, with an optional reason. Points can be taken away too. |
-| **Quests** | Recurring jobs (daily, weekly or one-off) worth a set number of points, assignable to specific kids or everyone. A kid taps **Done!**, you approve, the points land. |
+| **Quests** | Recurring jobs (daily, weekly or one-off) worth a set number of points, assignable to specific kids or everyone. Set *Times each* above 1 for something worth doing repeatedly — a tidy-up round three times a day. A kid taps **Done!**, you approve, the points land. |
 | **Shop** | Rewards you create, each with a point cost, an icon and a description. Stock can be unlimited, a fixed number that runs out, or an allowance that refills — "2 a day each" or "1 a month for the family to share". |
 | **Saving up** | A child can pick any reward to save for, and their home screen tracks progress toward it. Left alone, it shows whichever reward is closest. |
 | **Themes** | Eight colour themes children pick for themselves, changing their accent colour and background. |

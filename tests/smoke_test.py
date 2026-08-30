@@ -659,6 +659,71 @@ check("quest alert gives the points and how to pay out",
       n and "Worth 5 points" in n["body"] and "Approve" in n["body"],
       (n or {}).get("body", "").replace("\n", " | "))
 
+print("\n--- quests you can do more than once ---")
+t = token(parent, "/parent/quests")
+parent.post("/parent/quests", data={"_csrf": t, "title": "Tidy up round", "emoji": "\U0001f9f9",
+                                    "points": "3", "repeat": "daily",
+                                    "times_per_period": "3"}, follow_redirects=True)
+with app.app_context():
+    tidy = get_db().quests.find_one({"title": "Tidy up round"})
+check("times_per_period saved", tidy and tidy.get("times_per_period") == 3,
+      str((tidy or {}).get("times_per_period")))
+
+def claim(n):
+    tk = token(kidcli, "/me/")
+    return kidcli.post(f"/me/quests/{tidy['_id']}/done", data={"_csrf": tk},
+                       follow_redirects=True)
+
+for i in range(3):
+    claim(i)
+with app.app_context():
+    n = get_db().quest_claims.count_documents({"quest_id": tidy["_id"], "kid_id": kid["_id"]})
+check("a child can claim it three times in one day", n == 3, str(n))
+
+r = claim(4)
+with app.app_context():
+    n = get_db().quest_claims.count_documents({"quest_id": tidy["_id"], "kid_id": kid["_id"]})
+check("but not a fourth", n == 3, str(n))
+check("and is told why", "the lot" in r.get_data(as_text=True).lower())
+
+with app.app_context():
+    db = get_db()
+    seqs = sorted(c.get("seq") for c in
+                  db.quest_claims.find({"quest_id": tidy["_id"], "kid_id": kid["_id"]}))
+check("each claim got its own slot", seqs == [0, 1, 2], str(seqs))
+
+# rejecting one should free a go without reusing the slot
+with app.app_context():
+    first = get_db().quest_claims.find_one({"quest_id": tidy["_id"], "seq": 0})
+t = token(parent, "/parent/approvals")
+parent.post(f"/parent/approvals/quest/{first['_id']}",
+            data={"_csrf": t, "decision": "reject"}, follow_redirects=True)
+claim(5)
+with app.app_context():
+    db = get_db()
+    total = db.quest_claims.count_documents({"quest_id": tidy["_id"], "kid_id": kid["_id"]})
+    live = db.quest_claims.count_documents({"quest_id": tidy["_id"], "kid_id": kid["_id"],
+                                            "status": {"$in": ["pending", "approved"]}})
+check("a rejected go can be redone", live == 3 and total == 4, f"live={live} total={total}")
+
+# a plain once-a-day quest still behaves
+t = token(parent, "/parent/quests")
+parent.post("/parent/quests", data={"_csrf": t, "title": "Water the plants",
+                                    "emoji": "\U0001f331", "points": "2",
+                                    "repeat": "daily", "times_per_period": "1"},
+            follow_redirects=True)
+with app.app_context():
+    once = get_db().quests.find_one({"title": "Water the plants"})
+tk = token(kidcli, "/me/")
+kidcli.post(f"/me/quests/{once['_id']}/done", data={"_csrf": tk}, follow_redirects=True)
+tk = token(kidcli, "/me/")
+r = kidcli.post(f"/me/quests/{once['_id']}/done", data={"_csrf": tk}, follow_redirects=True)
+with app.app_context():
+    n = get_db().quest_claims.count_documents({"quest_id": once["_id"], "kid_id": kid["_id"]})
+check("a once-a-day quest is still once a day", n == 1, str(n))
+
+check("the kid home page still renders", kidcli.get("/me/").status_code == 200)
+
 print("\n--- logout ---")
 t = token(kidcli, "/me/")
 r = kidcli.post("/logout", data={"_csrf": t}, follow_redirects=False)

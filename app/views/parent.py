@@ -283,6 +283,8 @@ def create_quest():
         "emoji": (request.form.get("emoji", "").strip() or "⭐")[:4],
         "points": as_int(request.form.get("points"), default=5, low=1, high=1000),
         "repeat": repeat if repeat in REPEAT_CHOICES else "daily",
+        "times_per_period": as_int(request.form.get("times_per_period"),
+                                   default=1, low=1, high=20),
         "assigned_to": [a for a in assigned if a],
         "active": True,
     })
@@ -317,6 +319,9 @@ def update_quest(quest_id):
             "emoji": (request.form.get("emoji", "").strip() or "⭐")[:4],
             "points": as_int(request.form.get("points"), default=quest["points"], low=1, high=1000),
             "repeat": repeat if repeat in REPEAT_CHOICES else "daily",
+            "times_per_period": as_int(request.form.get("times_per_period"),
+                                       default=quest.get("times_per_period", 1),
+                                       low=1, high=20),
             "assigned_to": [a for a in assigned if a],
         }})
         flash(f"Updated '{quest['title']}'.", "success")

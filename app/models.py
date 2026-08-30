@@ -563,42 +563,70 @@ def get_quest(db, quest_id):
     return db.quests.find_one({"_id": _id}) if _id else None
 
 
+def quest_times(quest):
+    """How many times this quest can be done in one period."""
+    return max(1, int(quest.get("times_per_period") or 1))
+
+
+def quest_claims_in_period(db, quest, kid, key):
+    """Claims that count toward the limit — rejected ones don't."""
+    return list(db.quest_claims.find({
+        "quest_id": quest["_id"], "kid_id": kid["_id"], "period": key,
+        "status": {"$in": ["pending", "approved"]},
+    }))
+
+
 def quests_for_kid(db, kid, local_now):
-    """Active quests assigned to this kid, annotated with their current state
-    for this period: 'open', 'pending' or 'done'."""
+    """Active quests assigned to this kid, annotated with how many times
+    they've done it this period and whether another go is available."""
     out = []
     for quest in list_quests(db, active_only=True):
         assigned = quest.get("assigned_to") or []
         if assigned and kid["_id"] not in assigned:
             continue
+
         key = period_key(quest.get("repeat", "daily"), local_now)
-        claim = db.quest_claims.find_one(
-            {"quest_id": quest["_id"], "kid_id": kid["_id"], "period": key}
-        )
-        state = "open"
-        if claim:
-            state = "pending" if claim["status"] == "pending" else "done"
-            if claim["status"] == "rejected":
-                state = "open"
+        limit = quest_times(quest)
+        claims = quest_claims_in_period(db, quest, kid, key)
+        approved = sum(1 for c in claims if c["status"] == "approved")
+        pending = sum(1 for c in claims if c["status"] == "pending")
+
         quest = dict(quest)
-        quest["state"] = state
         quest["period"] = key
+        quest["limit"] = limit
+        quest["done_count"] = approved
+        quest["pending_count"] = pending
+        quest["used"] = approved + pending
+        if quest["used"] < limit:
+            quest["state"] = "open"
+        elif pending:
+            quest["state"] = "pending"
+        else:
+            quest["state"] = "done"
         out.append(quest)
     return out
 
 
 def claim_quest(db, quest, kid, local_now):
-    """Kid marks a quest as done; it waits for a parent to approve."""
+    """Kid marks a quest as done; it waits for a parent to approve. A quest
+    may allow several goes per period."""
     from pymongo.errors import DuplicateKeyError
 
     key = period_key(quest.get("repeat", "daily"), local_now)
-    existing = db.quest_claims.find_one(
-        {"quest_id": quest["_id"], "kid_id": kid["_id"], "period": key}
-    )
-    if existing and existing["status"] in ("pending", "approved"):
-        return None, "You've already sent that one in."
+    limit = quest_times(quest)
+    used = len(quest_claims_in_period(db, quest, kid, key))
+    if used >= limit:
+        return None, _quest_all_done(quest, limit)
 
-    doc = {
+    # Next free slot. Rejected claims keep their slot so the numbering stays
+    # unique, which is what lets the index guard against a double tap.
+    highest = db.quest_claims.find_one(
+        {"quest_id": quest["_id"], "kid_id": kid["_id"], "period": key},
+        sort=[("seq", -1)], projection={"seq": 1},
+    )
+    seq = int((highest or {}).get("seq") or 0) + 1 if highest else 0
+
+    base = {
         "quest_id": quest["_id"],
         "kid_id": kid["_id"],
         "kid_name": kid["name"],
@@ -612,14 +640,22 @@ def claim_quest(db, quest, kid, local_now):
         "decided_at": None,
         "decided_by": None,
     }
-    try:
-        if existing:  # a previously rejected claim: let them try again
-            db.quest_claims.replace_one({"_id": existing["_id"]}, doc)
-        else:
+    for attempt in range(3):                 # lose a race, take the next slot
+        doc = dict(base, seq=seq + attempt)
+        try:
             db.quest_claims.insert_one(doc)
-    except DuplicateKeyError:
-        return None, "You've already sent that one in."
-    return doc, None
+            return doc, None
+        except DuplicateKeyError:
+            continue
+    return None, "That didn't go through — try again."
+
+
+def _quest_all_done(quest, limit):
+    per = {"daily": "today", "weekly": "this week"}.get(
+        quest.get("repeat", "daily"), "already")
+    if limit == 1:
+        return "You've already sent that one in."
+    return f"You've done that {limit} times {per} — that's the lot!"
 
 
 def decide_quest_claim(db, claim_id, approve, actor):

@@ -63,6 +63,9 @@
           <p class="quest__meta">
             <span class="chip chip--pts">+{{ q.points }} &#11088;</span>
             <span class="chip">{{ q.repeat }}</span>
+            {% if q.limit > 1 %}
+              <span class="chip chip--reps">{{ q.used }} of {{ q.limit }} done</span>
+            {% endif %}
           </p>
         </div>
         {% if q.state == 'open' %}

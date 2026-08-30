@@ -557,13 +557,19 @@ input, select, button, textarea { font: inherit; color: inherit; }
   text-transform: uppercase; letter-spacing: .04em;
 }
 .field > span em { text-transform: none; letter-spacing: 0; color: var(--ink-3); font-weight: 600; }
-.field input, .field select {
+/* One height for every control on a row, regardless of font size. The emoji
+   box sets a larger font, which used to make it noticeably taller. Checkboxes
+   and radios are excluded — several are visually hidden and restyled. */
+.field input:not([type="checkbox"]):not([type="radio"]),
+.field select {
   width: 100%;
-  padding: 11px 14px;
+  height: 48px;
+  padding: 0 14px;
   border: 2px solid var(--line);
   border-radius: var(--r-md);
   background: #fbfaff;
   min-width: 0;
+  line-height: normal;
 }
 .field input:focus, .field select:focus { outline: none; border-color: var(--grape); }
 .field--grow { flex: 1 1 200px; }
@@ -571,7 +577,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
 .field--full { flex: 1 1 100%; }
 .field--emoji { flex: 0 0 78px; }
 p.field--full { flex: 1 1 100%; margin: 0; }
-.emoji-input { text-align: center; font-size: 1.4rem; padding: 7px 4px; }
+.emoji-input { text-align: center; font-size: 1.4rem; padding: 0 4px; }
 .field--emoji input { width: 78px; }
 .card--form > .formgrid { margin: 0; }
 
@@ -993,3 +999,5 @@ p.field--full { flex: 1 1 100%; margin: 0; }
 .groupchip:hover { border-color: var(--grape); color: var(--grape); }
 .groupchip.is-added { background: rgba(18, 214, 160, .16); border-color: transparent; color: #0a8b68; }
 .groupchip.is-added::after { content: " \2713"; }
+
+.chip--reps { background: rgba(124, 77, 255, .12); color: var(--grape); }

@@ -9,6 +9,29 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [1.4.0] — 2026-08-30
+
+### Added
+
+- **Quests can be done more than once in a period.** A new *Times each* field
+  sets how many goes are available — a tidy-up round worth doing three times a
+  day, say. Children see "1 of 3 done" on the card and the **Done!** button
+  stays until they've used them all. Existing quests are unaffected and stay
+  at one.
+
+### Fixed
+
+- **Form controls on the quest form were different heights.** The icon box
+  rendered 58px against 49px for its neighbours, because the larger emoji font
+  combined with padding that a more specific rule was overriding. Every
+  control in a form row is now a uniform 48px.
+
+### Notes
+
+- The uniqueness index on quest claims now includes an occurrence number, so
+  simultaneous taps still can't create a duplicate claim. The old index is
+  dropped automatically on first run.
+
 ## [1.3.1] — 2026-08-30
 
 ### Fixed
@@ -183,7 +206,8 @@ First release.
 - CSRF protection on every mutation, and route guards keeping children out of
   grown-up pages.
 
-[Unreleased]: https://github.com/mahansford/questly/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/mahansford/questly/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/mahansford/questly/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/mahansford/questly/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/mahansford/questly/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/mahansford/questly/compare/v1.1.0...v1.2.0

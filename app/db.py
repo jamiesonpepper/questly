@@ -48,8 +48,13 @@ def ensure_indexes(db):
     db.notifications.create_index([("created_at", ASCENDING)],
                                   expireAfterSeconds=90 * 24 * 60 * 60)
 
-    # One claim per kid, per quest, per period (day/week/ever).
+    # A quest can be worth doing more than once a day, so uniqueness includes
+    # an occurrence number. Two simultaneous claims race for the same slot and
+    # one loses on the unique index, which is what keeps it honest.
+    if "quest_id_1_kid_id_1_period_1" in db.quest_claims.index_information():
+        db.quest_claims.drop_index("quest_id_1_kid_id_1_period_1")
     db.quest_claims.create_index(
-        [("quest_id", ASCENDING), ("kid_id", ASCENDING), ("period", ASCENDING)],
+        [("quest_id", ASCENDING), ("kid_id", ASCENDING),
+         ("period", ASCENDING), ("seq", ASCENDING)],
         unique=True,
     )
