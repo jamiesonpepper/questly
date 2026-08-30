@@ -52,7 +52,7 @@
 
 <div class="stacklist">
   {% for kid in kids %}
-    <details class="rowcard" style="--kid:{{ kid.color }}">
+    <details class="rowcard" id="kid-{{ kid._id }}" style="--kid:{{ kid.color }}">
       <summary>
         <span class="rowcard__emoji">{{ kid.avatar }}</span>
         <span class="rowcard__title">
@@ -106,6 +106,15 @@
         </label>
         <button class="btn btn--ghost btn--sm" type="submit">Set PIN</button>
       </form>
+
+      <div class="rowcard__body">
+        <h3 class="card__title">{{ kid.name }}'s notifications</h3>
+        <p class="card__note">They always see these in the app. Add a channel
+        to reach them on a phone or tablet as well.</p>
+        {% set owner = kid %}
+        {% set events = kid_events %}
+        {% include 'partials/channels.html' %}
+      </div>
 
       <form method="post" action="{{ url_for('parent.update_kid', kid_id=kid._id) }}" class="subform subform--danger">
         {{ csrf_field() }}

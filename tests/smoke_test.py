@@ -452,6 +452,157 @@ plain.post("/login", data={"_csrf": t, "email": "matt.new@example.com",
 check("leaving remember unticked logs you in but stores nothing",
       plain.get("/parent/").status_code == 200 and plain.get_cookie("questly_email") is None)
 
+print("\n--- notifications ---")
+from app.notify import CHANNELS, EVENTS, deliver, recent, unread_count
+
+with app.app_context():
+    db = get_db()
+    db.notifications.delete_many({})
+    parent_doc = db.users.find_one({"_id": me["_id"]})
+
+# a purchase should tell the grown-ups. Use a fresh unlimited reward — the
+# earlier tests have already used up this child's allowance on the others.
+t = token(parent, "/parent/rewards")
+parent.post("/parent/rewards", data={"_csrf": t, "title": "Sticker", "emoji": "\U0001f31f",
+                                     "cost": "1", "stock_mode": "unlimited"},
+            follow_redirects=True)
+with app.app_context():
+    sticker = get_db().rewards.find_one({"title": "Sticker"})
+    get_db().notifications.delete_many({})
+t = token(kidcli, "/me/shop")
+kidcli.post(f"/me/shop/{sticker['_id']}/buy", data={"_csrf": t}, follow_redirects=True)
+with app.app_context():
+    db = get_db()
+    n = db.notifications.count_documents({"user_id": me["_id"], "event": "approval_waiting"})
+check("buying notifies the grown-ups", n >= 1, str(n))
+
+# approving should tell the child
+with app.app_context():
+    red = get_db().redemptions.find_one({"kid_id": kid["_id"], "status": "pending"})
+t = token(parent, "/parent/approvals")
+parent.post(f"/parent/approvals/redemption/{red['_id']}",
+            data={"_csrf": t, "decision": "approve"}, follow_redirects=True)
+with app.app_context():
+    n = get_db().notifications.count_documents({"user_id": kid["_id"],
+                                                "event": "purchase_approved"})
+check("approving a purchase notifies the child", n == 1, str(n))
+
+# a new shop item should tell every child
+t = token(parent, "/parent/rewards")
+parent.post("/parent/rewards", data={"_csrf": t, "title": "Roller Skates", "emoji": "\U0001f6fc",
+                                     "cost": "300", "stock_mode": "unlimited"},
+            follow_redirects=True)
+with app.app_context():
+    db = get_db()
+    kids = db.users.count_documents({"role": "kid"})
+    n = db.notifications.count_documents({"event": "shop_new"})
+check("a new shop item notifies every child", n == kids, f"{n} of {kids}")
+
+# awarding points
+t = token(parent, "/parent/")
+parent.post("/parent/award", data={"_csrf": t, "kid_id": str(kid["_id"]), "amount": "10",
+                                   "reason": "Being helpful"}, follow_redirects=True)
+with app.app_context():
+    n = get_db().notifications.count_documents({"user_id": kid["_id"],
+                                                "event": "points_awarded"})
+check("awarding points notifies the child", n == 1, str(n))
+
+print("\n--- reaching a savings goal ---")
+with app.app_context():
+    db = get_db()
+    db.notifications.delete_many({"event": "goal_reached"})
+    skates = db.rewards.find_one({"title": "Roller Skates"})
+    db.users.update_one({"_id": kid["_id"]},
+                        {"$set": {"points": 0, "goal_reward_id": skates["_id"],
+                                  "goal_notified": False}})
+t = token(parent, "/parent/")
+parent.post("/parent/award", data={"_csrf": t, "kid_id": str(kid["_id"]), "amount": "100",
+                                   "reason": "part way"}, follow_redirects=True)
+with app.app_context():
+    n = get_db().notifications.count_documents({"user_id": kid["_id"], "event": "goal_reached"})
+check("no goal alert before they can afford it", n == 0, str(n))
+
+t = token(parent, "/parent/")
+parent.post("/parent/award", data={"_csrf": t, "kid_id": str(kid["_id"]), "amount": "250",
+                                   "reason": "there"}, follow_redirects=True)
+with app.app_context():
+    n = get_db().notifications.count_documents({"user_id": kid["_id"], "event": "goal_reached"})
+check("goal alert fires when they get there", n == 1, str(n))
+
+t = token(parent, "/parent/")
+parent.post("/parent/award", data={"_csrf": t, "kid_id": str(kid["_id"]), "amount": "50",
+                                   "reason": "more"}, follow_redirects=True)
+with app.app_context():
+    n = get_db().notifications.count_documents({"user_id": kid["_id"], "event": "goal_reached"})
+check("and doesn't nag on every award after that", n == 1, str(n))
+
+print("\n--- the in-app feed ---")
+with app.app_context():
+    db = get_db()
+    before = unread_count(db, kid["_id"])
+check("unread count reflects the feed", before > 0, str(before))
+kidcli.get("/me/news")
+with app.app_context():
+    after = unread_count(get_db(), kid["_id"])
+check("opening the feed marks them read", after == 0, str(after))
+check("the feed renders", kidcli.get("/me/news").status_code == 200)
+check("grown-up feed renders", parent.get("/parent/news").status_code == 200)
+
+print("\n--- delivery channels ---")
+t = token(parent, "/parent/account")
+parent.post(f"/parent/channels/{me['_id']}", data={
+    "_csrf": t, "type": "ntfy", "ntfy__topic": "questly-test-topic",
+    "ntfy__server": "http://127.0.0.1:9"}, follow_redirects=True)
+with app.app_context():
+    owner = get_db().users.find_one({"_id": me["_id"]})
+chans = owner.get("channels", [])
+check("channel saved against the grown-up", len(chans) == 1 and chans[0]["type"] == "ntfy")
+check("the secret-free summary is used in the UI",
+      "questly-test-topic" in __import__("app.notify", fromlist=["x"]).channel_summary(chans[0]))
+
+t = token(parent, "/parent/family")
+parent.post(f"/parent/channels/{kid['_id']}", data={
+    "_csrf": t, "type": "signal", "signal__api_url": "http://127.0.0.1:9",
+    "signal__number": "+440000000000", "signal__recipients": "+440000000001"},
+    follow_redirects=True)
+with app.app_context():
+    kid_doc = get_db().users.find_one({"_id": kid["_id"]})
+check("a grown-up can set up a channel for a child",
+      len(kid_doc.get("channels", [])) == 1)
+
+t = token(parent, "/parent/family")
+parent.post(f"/parent/channels/{kid['_id']}", data={
+    "_csrf": t, "type": "signal", "signal__api_url": "http://127.0.0.1:9"},
+    follow_redirects=True)
+with app.app_context():
+    kid_doc = get_db().users.find_one({"_id": kid["_id"]})
+check("a channel missing required fields is refused",
+      len(kid_doc.get("channels", [])) == 1)
+
+ok, detail = deliver({"type": "ntfy", "config": {"topic": "x", "server": "http://127.0.0.1:9"}},
+                     "t", "b")
+check("an unreachable endpoint fails gracefully rather than raising", ok is False)
+ok, detail = deliver({"type": "nonsense", "config": {}}, "t", "b")
+check("an unknown channel type is reported, not raised",
+      ok is False and "Unknown" in detail)
+
+with app.app_context():
+    other = get_db().users.find_one({"email": "partner@example.com"})
+t = token(parent, "/parent/account")
+parent.post(f"/parent/channels/{other['_id']}", data={
+    "_csrf": t, "type": "ntfy", "ntfy__topic": "sneaky"}, follow_redirects=True)
+with app.app_context():
+    other = get_db().users.find_one({"_id": other["_id"]})
+check("you can't add channels to another grown-up's account",
+      not other.get("channels"))
+
+t = token(parent, "/parent/account")
+parent.post(f"/parent/channels/{me['_id']}/{chans[0]['id']}/delete",
+            data={"_csrf": t}, follow_redirects=True)
+with app.app_context():
+    owner = get_db().users.find_one({"_id": me["_id"]})
+check("channel removed", not owner.get("channels"))
+
 print("\n--- logout ---")
 t = token(kidcli, "/me/")
 r = kidcli.post("/logout", data={"_csrf": t}, follow_redirects=False)

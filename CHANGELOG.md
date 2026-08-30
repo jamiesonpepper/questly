@@ -9,6 +9,33 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [1.2.0] — 2026-08-30
+
+### Added
+
+- **Notifications.** Every notable event is recorded in an in-app feed with an
+  unread badge, for children and grown-ups alike. Children are told about new
+  shop items, decisions on their quests and purchases, points awarded, and
+  when they can finally afford what they're saving for; grown-ups are told
+  when something needs approving.
+- **Per-person delivery channels.** On top of the in-app feed, each person can
+  have their own channels — ntfy, Signal (via a self-hosted
+  signal-cli-rest-api bridge), Gotify, Telegram, Discord, Pushover, or a plain
+  webhook. So a young child can see notifications only in the app while an
+  older one gets a push on their tablet. Channels can be limited to particular
+  kinds of update, and each has a Test button.
+
+### Notes
+
+- Sends run on a background thread; a slow or unreachable endpoint never
+  delays the app, and failures are logged rather than surfaced to a child.
+- Channel settings, which include tokens, are stored in the database as
+  entered. Keep the database on trusted storage.
+- The feed is capped at 90 days by a TTL index.
+- Lock-screen Web Push is deliberately not used: it requires HTTPS (and, on
+  iOS, home-screen installation), which a plain-HTTP home deployment can't
+  provide. Outbound channels avoid that constraint.
+
 ## [1.1.0] — 2026-08-21
 
 ### Added
@@ -121,7 +148,8 @@ First release.
 - CSRF protection on every mutation, and route guards keeping children out of
   grown-up pages.
 
-[Unreleased]: https://github.com/mahansford/questly/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/mahansford/questly/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/mahansford/questly/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mahansford/questly/compare/v1.0.2...v1.1.0
 [1.0.2]: https://github.com/mahansford/questly/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/mahansford/questly/compare/v1.0.0...v1.0.1

@@ -54,15 +54,15 @@ web app.
 
 ### For kids
 
-| Pick your face | Type your PIN | Save up for something | Spend your points | Choose your look |
-|:---:|:---:|:---:|:---:|:---:|
-| <img src="docs/screenshots/01-whos-here.png" alt="The who's-here screen, showing each kid as a card with their avatar and point balance" width="180"> | <img src="docs/screenshots/02-pin.png" alt="A large numeric keypad for entering a 4-6 digit PIN" width="180"> | <img src="docs/screenshots/03-kid-home.png" alt="A kid's home screen tracking progress toward a chosen reward, above a list of quests" width="180"> | <img src="docs/screenshots/04-shop.png" alt="The shop, showing rewards with point prices and how many are available" width="180"> | <img src="docs/screenshots/05-themes.png" alt="A grid of colour themes a child can pick from" width="180"> |
+| Pick your face | Type your PIN | Save up for something | Spend your points | Choose your look | See what's new |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/01-whos-here.png" alt="The who's-here screen, showing each kid as a card with their avatar and point balance" width="150"> | <img src="docs/screenshots/02-pin.png" alt="A large numeric keypad for entering a 4-6 digit PIN" width="150"> | <img src="docs/screenshots/03-kid-home.png" alt="A kid's home screen tracking progress toward a chosen reward, above a list of quests" width="150"> | <img src="docs/screenshots/04-shop.png" alt="The shop, showing rewards with point prices and how many are available" width="150"> | <img src="docs/screenshots/05-themes.png" alt="A grid of colour themes a child can pick from" width="150"> | <img src="docs/screenshots/10-kid-news.png" alt="A child's notification feed listing recent points, approvals and new shop items" width="150"> |
 
 ### For grown-ups
 
-| Award points | Approve what's waiting | Stock the shop |
-|:---:|:---:|:---:|
-| <img src="docs/screenshots/06-award-points.png" alt="Each kid on a card with quick award buttons and a reason box" width="200"> | <img src="docs/screenshots/07-approvals.png" alt="Pending rewards to hand over and quests to check, each with approve and reject buttons" width="200"> | <img src="docs/screenshots/08-shop-admin.png" alt="The reward form, showing options for how many of an item are available" width="200"> |
+| Award points | Approve what's waiting | Stock the shop | Route notifications |
+|:---:|:---:|:---:|:---:|
+| <img src="docs/screenshots/06-award-points.png" alt="Each kid on a card with quick award buttons and a reason box" width="180"> | <img src="docs/screenshots/07-approvals.png" alt="Pending rewards to hand over and quests to check, each with approve and reject buttons" width="180"> | <img src="docs/screenshots/08-shop-admin.png" alt="The reward form, showing options for how many of an item are available" width="180"> | <img src="docs/screenshots/09-notifications.png" alt="Choosing a notification channel such as Signal, with its connection fields" width="180"> |
 
 ---
 
@@ -134,6 +134,7 @@ docker compose exec web flask --app wsgi:app seed-demo
 | **Shop** | Rewards you create, each with a point cost, an icon and a description. Stock can be unlimited, a fixed number that runs out, or an allowance that refills — "2 a day each" or "1 a month for the family to share". |
 | **Saving up** | A child can pick any reward to save for, and their home screen tracks progress toward it. Left alone, it shows whichever reward is closest. |
 | **Themes** | Eight colour themes children pick for themselves, changing their accent colour and background. |
+| **Notifications** | Everyone gets an in-app feed with an unread badge. On top of that, each person can have their own delivery channels — so a young child sees notifications only in the app, an older one gets ntfy on their tablet, and you get Signal on your phone. |
 | **Buying** | Points are deducted the moment a kid buys, and the reward queues up for you to hand over. Turning a request down refunds the points automatically. |
 | **Approvals** | One page listing every quest and purchase waiting on you, with a count badge in the nav. |
 | **Accounts** | Each grown-up can change their own name, login email, icon and password, and stay signed in on a trusted device. |
@@ -151,6 +152,42 @@ docker compose exec web flask --app wsgi:app seed-demo
 - A refilling allowance resets on its own — nothing to top up — and rejecting a
   purchase frees its slot again.
 - Every mutation is CSRF-protected, and kids can't reach grown-up pages.
+
+---
+
+## Notifications
+
+Every notification is recorded in the app first, with an unread badge — that
+needs no setup, no permissions and nothing installed. Children are told when
+something new appears in the shop, when a quest or purchase is decided, when
+they're awarded points, and when they can finally afford what they're saving
+for. Grown-ups are told when something needs approving.
+
+Each person can then add their own **delivery channels** on top, set up by a
+grown-up under *Family* (for a child) or *My account* (for themselves):
+
+| Channel | Notes |
+| --- | --- |
+| **ntfy** | Free push to a phone or tablet. Best fit for children — they subscribe to a topic, no account needed. Use the public `ntfy.sh` or your own server. |
+| **Signal** | Signal has no public API, so this posts to a self-hosted [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) bridge, which is itself in Unraid Community Apps. |
+| **Gotify** | Self-hosted push server with Android and web clients. |
+| **Telegram** | Via a bot you create with @BotFather. |
+| **Discord** | Posts into a channel through a webhook. |
+| **Pushover** | Paid one-off app for iOS and Android. |
+| **Webhook** | Posts `{"title", "body"}` as JSON to anything — Home Assistant, Node-RED, your own script. |
+
+Each channel can be limited to particular kinds of update, and there's a
+**Test** button that sends a message immediately so you know it works.
+
+Sends happen on a background thread, so a slow or unreachable endpoint never
+holds up the app, and a failure is logged rather than shown to a child.
+
+> **Why not lock-screen push from the app itself?** Web Push needs a service
+> worker, which browsers only run over HTTPS, and on iOS it additionally
+> requires the app to be installed to the home screen. Questly serves plain
+> HTTP on a home network, so it can't. Channels like ntfy sidestep that
+> entirely: the server makes an outbound call, so no certificate is needed.
+> If you put HTTPS in front of Questly, Web Push becomes possible.
 
 ---
 

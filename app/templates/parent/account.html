@@ -42,6 +42,14 @@
 </section>
 
 <section class="card card--form">
+  <h2 class="card__title">Where your notifications go</h2>
+  <p class="card__note">You always see them in the app. Add a channel to get
+  them on your phone as well.</p>
+  {% set owner = me %}
+  {% include 'partials/channels.html' %}
+</section>
+
+<section class="card card--form">
   <h2 class="card__title">Change your password</h2>
   <form method="post" action="{{ url_for('parent.change_password') }}" class="formgrid">
     {{ csrf_field() }}

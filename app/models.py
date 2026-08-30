@@ -230,6 +230,34 @@ def set_parent_password(db, parent_id, password):
     return True, None
 
 
+def add_channel(db, user_id, channel_type, config, events=None):
+    """Attach a delivery channel to someone. Returns the new channel's id."""
+    import uuid
+    channel = {
+        "id": uuid.uuid4().hex[:12],
+        "type": channel_type,
+        "config": config,
+        "events": events or [],
+        "enabled": True,
+        "created_at": now(),
+    }
+    db.users.update_one({"_id": oid(user_id)}, {"$push": {"channels": channel}})
+    return channel
+
+
+def remove_channel(db, user_id, channel_id):
+    db.users.update_one({"_id": oid(user_id)},
+                        {"$pull": {"channels": {"id": channel_id}}})
+
+
+def get_channel(db, user_id, channel_id):
+    user = db.users.find_one({"_id": oid(user_id)}, {"channels": 1})
+    for c in (user or {}).get("channels", []):
+        if c.get("id") == channel_id:
+            return c
+    return None
+
+
 def set_kid_theme(db, kid_id, theme_key):
     """A child picks their own look. The accent is mirrored onto `color` so
     grown-up screens keep identifying them consistently."""
@@ -247,7 +275,8 @@ def set_kid_goal(db, kid_id, reward_id):
     """Track a particular reward, or pass None to go back to automatic."""
     db.users.update_one(
         {"_id": oid(kid_id), "role": "kid"},
-        {"$set": {"goal_reward_id": oid(reward_id) if reward_id else None}},
+        {"$set": {"goal_reward_id": oid(reward_id) if reward_id else None,
+                  "goal_notified": False}},
     )
 
 

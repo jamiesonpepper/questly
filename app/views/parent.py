@@ -9,9 +9,13 @@ from ..models import (AVATARS, COLORS, PARENT_AVATARS, REPEAT_CHOICES,
                       history_for, list_kids, list_parents, list_quests,
                       list_rewards, oid, pending_claims, pending_redemptions,
                       recent_activity, redemptions_for, set_kid_pin,
+                      add_channel, get_channel, remove_channel,
                       set_parent_password, stock_label, stock_mode,
                       update_parent)
-from .helpers import as_int, parent_required, safe_next
+from ..notify import (CHANNELS, channel_summary, deliver,
+                      events_for, mark_all_read, notify, notify_many,
+                      recent)
+from .helpers import as_int, check_goal_reached, parent_required, safe_next
 
 bp = Blueprint("parent", __name__, url_prefix="/parent")
 
@@ -58,6 +62,10 @@ def award():
     if not kid:
         flash("Couldn't find that child.", "error")
     else:
+        if amount > 0:
+            notify(db, kid, "points_awarded", f"You got {amount} points!",
+                   reason or f"{g.user['name']} awarded you {amount} points.")
+            check_goal_reached(db, kid["_id"])
         verb = "Gave" if amount > 0 else "Took"
         flash(f"{verb} {abs(amount)} points {'to' if amount > 0 else 'from'} {kid['name']}.",
               "success")
@@ -105,8 +113,16 @@ def decide_redemption_route(redemption_id):
     if not red:
         flash("That request was already dealt with.", "warn")
     elif approve:
+        notify(get_db(), red["kid_id"], "purchase_approved",
+               f"{red['reward_emoji']} {red['reward_title']} is yours!",
+               "A grown-up has handed it over. Enjoy!")
         flash(f"Marked '{red['reward_title']}' as handed over to {red['kid_name']}.", "success")
     else:
+        db = get_db()
+        notify(db, red["kid_id"], "purchase_rejected",
+               f"{red['reward_title']} wasn't approved",
+               f"Your {red['cost']} points have been put back.")
+        check_goal_reached(db, red["kid_id"])
         flash(f"Turned down '{red['reward_title']}' — {red['cost']} points refunded.", "info")
     return redirect(safe_next(url_for("parent.approvals")))
 
@@ -119,9 +135,17 @@ def decide_claim_route(claim_id):
     if not claim:
         flash("That request was already dealt with.", "warn")
     elif approve:
+        db = get_db()
+        notify(db, claim["kid_id"], "quest_approved",
+               f"{claim['quest_emoji']} {claim['quest_title']} approved!",
+               f"You earned {claim['points']} points.")
+        check_goal_reached(db, claim["kid_id"])
         flash(f"{claim['kid_name']} earned {claim['points']} points for "
               f"'{claim['quest_title']}'.", "success")
     else:
+        notify(get_db(), claim["kid_id"], "quest_rejected",
+               f"{claim['quest_title']} was sent back",
+               "Have another go and mark it done again.")
         flash(f"Sent '{claim['quest_title']}' back to {claim['kid_name']}.", "info")
     return redirect(safe_next(url_for("parent.approvals")))
 
@@ -181,6 +205,9 @@ def create_reward():
     }
     doc.update(_stock_fields(request.form))
     db.rewards.insert_one(doc)
+    notify_many(db, list_kids(db), "shop_new",
+                f"New in the shop: {title}",
+                f"{doc['emoji']} {title} — {doc['cost']} points.")
     flash(f"Added '{title}' to the shop.", "success")
     return redirect(url_for("parent.rewards"))
 
@@ -301,7 +328,10 @@ def family():
                            kids=list_kids(db),
                            parents=list_parents(db),
                            avatars=AVATARS,
-                           colors=COLORS)
+                           colors=COLORS,
+                           channels=CHANNELS,
+                           kid_events=events_for("kid"),
+                           summary=channel_summary)
 
 
 @bp.post("/family/kids")
@@ -383,6 +413,104 @@ def add_parent():
     return redirect(url_for("parent.family"))
 
 
+@bp.get("/news")
+@parent_required
+def news():
+    db = get_db()
+    items = recent(db, g.user["_id"], limit=50)
+    mark_all_read(db, g.user["_id"])
+    return render_template("parent/news.html", items=items)
+
+
+# ---------------------------------------------------------------------------
+# notification channels
+# ---------------------------------------------------------------------------
+
+def _channel_owner(db, owner_id):
+    """A grown-up may manage their own channels and any child's, but not
+    another grown-up's — those are personal."""
+    if str(owner_id) == str(g.user["_id"]):
+        return g.user
+    target = get_user(db, owner_id)
+    if target and target["role"] == "kid":
+        return target
+    return None
+
+
+def _owner_redirect(owner):
+    if owner["role"] == "kid":
+        return redirect(url_for("parent.family") + f"#kid-{owner['_id']}")
+    return redirect(url_for("parent.account"))
+
+
+@bp.post("/channels/<owner_id>")
+@parent_required
+def add_channel_route(owner_id):
+    db = get_db()
+    owner = _channel_owner(db, owner_id)
+    if not owner:
+        flash("You can only set up your own channels, or a child's.", "error")
+        return redirect(url_for("parent.account"))
+
+    kind = request.form.get("type", "")
+    spec = CHANNELS.get(kind)
+    if not spec:
+        flash("Pick a notification type.", "error")
+        return _owner_redirect(owner)
+
+    config, missing = {}, []
+    for key, label, _t, required, _ph, _help in spec["fields"]:
+        value = request.form.get(f"{kind}__{key}", "").strip()
+        if value:
+            config[key] = value
+        elif required:
+            missing.append(label)
+    if missing:
+        flash(f"{spec['label']} needs: {', '.join(missing)}.", "error")
+        return _owner_redirect(owner)
+
+    allowed = set(events_for(owner["role"]))
+    events = [e for e in request.form.getlist("events") if e in allowed]
+
+    channel = add_channel(db, owner["_id"], kind, config, events)
+    ok, detail = deliver(channel, "Questly is connected",
+                         f"Notifications for {owner['name']} will arrive here.")
+    if ok:
+        flash(f"{spec['label']} connected — a test message is on its way.", "success")
+    else:
+        flash(f"Saved, but the test message failed: {detail}", "warn")
+    return _owner_redirect(owner)
+
+
+@bp.post("/channels/<owner_id>/<channel_id>/test")
+@parent_required
+def test_channel(owner_id, channel_id):
+    db = get_db()
+    owner = _channel_owner(db, owner_id)
+    channel = get_channel(db, owner_id, channel_id) if owner else None
+    if not channel:
+        flash("Couldn't find that channel.", "error")
+        return redirect(url_for("parent.account"))
+    ok, detail = deliver(channel, "Questly test",
+                         f"If {owner['name']} can read this, it's working.")
+    flash("Test message sent." if ok else f"Test failed: {detail}",
+          "success" if ok else "error")
+    return _owner_redirect(owner)
+
+
+@bp.post("/channels/<owner_id>/<channel_id>/delete")
+@parent_required
+def delete_channel(owner_id, channel_id):
+    db = get_db()
+    owner = _channel_owner(db, owner_id)
+    if not owner:
+        flash("Couldn't find that channel.", "error")
+        return redirect(url_for("parent.account"))
+    remove_channel(db, owner["_id"], channel_id)
+    flash("Channel removed.", "info")
+    return _owner_redirect(owner)
+
+
 # ---------------------------------------------------------------------------
 # your own account
 # ---------------------------------------------------------------------------
@@ -392,7 +520,10 @@ def add_parent():
 def account():
     return render_template("parent/account.html",
                            me=g.user,
-                           avatars=PARENT_AVATARS)
+                           avatars=PARENT_AVATARS,
+                           channels=CHANNELS,
+                           events=events_for("parent"),
+                           summary=channel_summary)
 
 
 @bp.post("/account/profile")

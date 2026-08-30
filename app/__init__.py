@@ -126,16 +126,22 @@ def _register_context(app):
     @app.context_processor
     def inject():
         approvals = 0
-        if getattr(g, "user", None) and g.user["role"] == "parent":
+        unread = 0
+        user = getattr(g, "user", None)
+        if user:
             try:
-                approvals = pending_count(get_db())
+                from .notify import unread_count
+                unread = unread_count(get_db(), user["_id"])
+                if user["role"] == "parent":
+                    approvals = pending_count(get_db())
             except Exception:
-                approvals = 0
+                pass
         return {
             "app_name": app.config["APP_NAME"],
             "celebrate": session.pop("celebrate", None),
             "current_user": getattr(g, "user", None),
             "approvals_waiting": approvals,
+            "unread_news": unread,
             "palette": COLORS,
         }
 
@@ -195,3 +201,7 @@ def _register_filters(app):
         return "Good evening"
 
     app.jinja_env.globals["greeting"] = greeting
+
+    from .notify import EVENTS
+    app.jinja_env.globals["event_icon"] = (
+        lambda e: EVENTS.get(e, {}).get("icon", "\U0001f514"))

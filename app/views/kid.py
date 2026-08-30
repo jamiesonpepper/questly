@@ -6,6 +6,8 @@ from ..models import (THEMES, annotate_rewards, claim_quest, get_quest,
                       get_reward, goal_for, history_for, list_rewards,
                       quests_for_kid, redeem, redemptions_for, set_kid_goal,
                       set_kid_theme, theme_for)
+from ..models import list_parents
+from ..notify import mark_all_read, notify_many, recent
 from .helpers import kid_required, local_now
 
 bp = Blueprint("kid", __name__, url_prefix="/me")
@@ -63,6 +65,9 @@ def buy(reward_id):
     if error:
         flash(error, "error")
     else:
+        notify_many(db, list_parents(db), "approval_waiting",
+                    f"{g.user['name']} bought {reward['title']}",
+                    f"{reward['cost']} points spent. It needs handing over.")
         session["celebrate"] = f"You got {reward['title']}! Ask a grown-up to hand it over."
     return redirect(url_for("kid.shop"))
 
@@ -85,6 +90,9 @@ def finish_quest(quest_id):
     if error:
         flash(error, "warn")
     else:
+        notify_many(db, list_parents(db), "approval_waiting",
+                    f"{g.user['name']} finished {quest['title']}",
+                    f"Worth {quest['points']} points once you approve it.")
         session["celebrate"] = f"Nice one! {quest['points']} points on the way once it's checked."
     return redirect(url_for("kid.home"))
 
@@ -123,6 +131,15 @@ def choose_theme():
     else:
         flash("That's not one of the themes.", "error")
     return redirect(url_for("kid.theme"))
+
+
+@bp.get("/news")
+@kid_required
+def news():
+    db = get_db()
+    items = recent(db, g.user["_id"], limit=50)
+    mark_all_read(db, g.user["_id"])
+    return render_template("kid/news.html", kid=g.user, items=items)
 
 
 @bp.get("/stuff")

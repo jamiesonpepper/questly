@@ -325,7 +325,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
 .kidhead__row {
   width: min(1080px, 100%);
   margin: 0 auto;
-  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  display: flex; align-items: center; gap: 14px;
 }
 .kidhead__who { display: flex; align-items: center; gap: 12px; }
 .kidhead__face {
@@ -784,8 +784,11 @@ p.field--full { flex: 1 1 100%; margin: 0; }
 @media (max-width: 620px) {
   .topbar__inner { gap: 10px; }
   .topnav { order: 3; width: 100%; margin-left: 0; overflow-x: auto; flex-wrap: nowrap; }
+  /* the nav drops to its own row here, so keep the bell with the account
+     controls on the right instead of stranded beside the logo */
+  .topbar .bell { margin-left: auto; }
   .topnav a { flex: 0 0 auto; }
-  .topbar__out { margin-left: auto; }
+  .topbar__out { margin-left: 0; }
   .whoami { padding: 5px; }
   .whoami__name { display: none; }   /* keep the avatar tappable */
   .kidhead__name { font-size: 1.4rem; }
@@ -912,3 +915,67 @@ p.field--full { flex: 1 1 100%; margin: 0; }
 .stockbox__row.is-shown { display: flex; }
 .stockbox__row .card__note { flex: 1 1 100%; margin: 0; }
 .stockbox__row .field--num { flex: 0 1 170px; }
+
+
+/* --- notifications ------------------------------------------------------ */
+.bell {
+  position: relative;
+  display: grid; place-items: center;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: rgba(124, 77, 255, .10);
+  transition: background .15s, transform .12s;
+}
+.bell:hover { background: rgba(124, 77, 255, .18); transform: translateY(-1px); }
+.bell__ico { font-size: 1.15rem; line-height: 1; }
+.bell .pip {
+  position: absolute; top: -3px; right: -3px;
+  margin: 0;
+  box-shadow: 0 0 0 2px var(--paper);
+}
+.bell--kid {
+  background: rgba(255, 255, 255, .25);
+  /* the header row has three children now; keep the bell beside the balance
+     rather than stranded in the middle */
+  margin-left: auto;
+  margin-right: 10px;
+}
+.bell--kid:hover { background: rgba(255, 255, 255, .4); }
+.bell--kid .pip { box-shadow: 0 0 0 2px var(--kid); }
+.bell.has-new .bell__ico { animation: bell-ring 1.4s ease 2; transform-origin: 50% 10%; }
+
+@keyframes bell-ring {
+  0%, 60%, 100% { transform: rotate(0); }
+  10%, 30%, 50% { transform: rotate(12deg); }
+  20%, 40%      { transform: rotate(-12deg); }
+}
+
+.feed__row.is-fresh { background: rgba(124, 77, 255, .06); border-radius: var(--r-sm); }
+
+/* --- notification channels ---------------------------------------------- */
+.chanlist { display: flex; flex-direction: column; gap: 8px; }
+.chan {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+  background: #faf9ff;
+}
+.chan__ico { font-size: 1.4rem; }
+.chan__text { flex: 1; min-width: 140px; display: flex; flex-direction: column; }
+.chan__text span { color: var(--ink-3); font-size: .8rem; }
+
+.addchan { margin-top: 12px; }
+.addchan > summary {
+  cursor: pointer; list-style: none;
+  color: var(--grape); font-weight: 800; font-size: .9rem;
+}
+.addchan > summary::-webkit-details-marker { display: none; }
+.addchan > summary::before { content: "+ "; }
+.addchan[open] > summary::before { content: "\2212  "; }
+.addchan > form { display: flex; flex-direction: column; gap: 14px; margin-top: 14px; }
+
+.chanpick { margin: 0; }
+.chanfields { display: none; }
+.chanfields.is-shown { display: block; }
+.chanfields .formgrid { margin-top: 8px; }
+.hint { color: var(--ink-3); font-size: .76rem; font-weight: 600; line-height: 1.35; }

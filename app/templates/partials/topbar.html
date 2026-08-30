@@ -17,6 +17,12 @@
       <a href="{{ url_for('parent.family') }}" class="{{ 'is-active' if request.endpoint == 'parent.family' }}">Family</a>
     </nav>
 
+    <a class="bell {{ 'has-new' if unread_news }}" href="{{ url_for('parent.news') }}"
+       title="Notifications" aria-label="Notifications">
+      <span class="bell__ico">&#128276;</span>
+      {% if unread_news %}<span class="pip">{{ unread_news }}</span>{% endif %}
+    </a>
+
     <form method="post" action="{{ url_for('auth.logout') }}" class="topbar__out">
       {{ csrf_field() }}
       <a class="whoami" href="{{ url_for('parent.account') }}" title="Your account"><span class="whoami__face">{{ current_user.avatar or '🧑' }}</span><span class="whoami__name">{{ current_user.name }}</span></a>

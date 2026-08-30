@@ -115,6 +115,27 @@
     sync();
   });
 
+  /* ------------------------------------------- notification channel fields
+     Show only the fields belonging to the chosen channel type. */
+  document.querySelectorAll(".addchan").forEach(function (box) {
+    const radios = box.querySelectorAll('input[name="type"]');
+    const groups = box.querySelectorAll(".chanfields");
+
+    function sync() {
+      const chosen = box.querySelector('input[name="type"]:checked');
+      const kind = chosen ? chosen.value : null;
+      groups.forEach(function (g) {
+        const on = g.dataset.when === kind;
+        g.classList.toggle("is-shown", on);
+        // Don't submit (or validate) fields for the types you didn't pick.
+        g.querySelectorAll("input").forEach(function (i) { i.disabled = !on; });
+      });
+    }
+
+    radios.forEach(function (r) { r.addEventListener("change", sync); });
+    sync();
+  });
+
   /* ------------------------------------------------------------- celebrate */
   const toast = document.querySelector("[data-celebrate]");
   if (toast) {
