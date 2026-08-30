@@ -9,6 +9,21 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [1.3.1] — 2026-08-30
+
+### Fixed
+
+- **"Find my groups" now explains an empty result.** A Signal bridge running
+  in `normal` or `native` mode only learns about groups when something calls
+  `receive`; until then the group list is legitimately empty. Questly used to
+  report a bare "no groups", which looked like a bug. It now checks the
+  bridge's mode and tells you exactly what to do.
+- Group ids fall back to `internal_id`, and a wrapped `{"groups": [...]}`
+  response is accepted, for compatibility across bridge versions.
+- The outbound HTTP timeout went from 10s to 30s, overridable with
+  `NOTIFY_TIMEOUT`. In `normal` mode the bridge starts a JVM per request and a
+  cold first call can exceed ten seconds.
+
 ## [1.3.0] — 2026-08-30
 
 ### Added
@@ -168,7 +183,8 @@ First release.
 - CSRF protection on every mutation, and route guards keeping children out of
   grown-up pages.
 
-[Unreleased]: https://github.com/mahansford/questly/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/mahansford/questly/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/mahansford/questly/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/mahansford/questly/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/mahansford/questly/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/mahansford/questly/compare/v1.0.2...v1.1.0

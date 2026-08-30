@@ -12,6 +12,7 @@ app context, so it is safe off-thread — callers pass in plain data.
 
 import json
 import logging
+import os
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -21,7 +22,9 @@ from datetime import datetime, timezone
 log = logging.getLogger(__name__)
 
 _pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="questly-notify")
-TIMEOUT = 10
+# signal-cli in "normal" mode starts a JVM per request; a cold first call can
+# take well over ten seconds.
+TIMEOUT = int(os.environ.get("NOTIFY_TIMEOUT", "30"))
 
 
 # ---------------------------------------------------------------------------
@@ -99,11 +102,44 @@ def signal_groups(api_url, number):
     except Exception as exc:                                # noqa: BLE001
         return [], str(exc)
 
-    groups = [{"id": g.get("id"), "name": g.get("name") or "(unnamed group)"}
-              for g in data if g.get("id")]
-    if not groups:
-        return [], "That number isn't in any groups the bridge can see."
-    return sorted(groups, key=lambda g: g["name"].lower()), None
+    if isinstance(data, dict):                # some builds wrap the list
+        data = data.get("groups", [])
+
+    groups = []
+    for g in data:
+        if not isinstance(g, dict):
+            continue
+        gid = g.get("id") or g.get("internal_id")
+        if gid:
+            groups.append({"id": gid, "name": g.get("name") or "(unnamed group)"})
+
+    if groups:
+        return sorted(groups, key=lambda g: g["name"].lower()), None
+    return [], _no_groups_hint(api, len(data))
+
+
+def _no_groups_hint(api, raw_count):
+    """An empty group list is nearly always a sync problem rather than a real
+    absence of groups, so say which, and what to do about it."""
+    if raw_count:
+        return (f"The bridge returned {raw_count} group(s) but none had an id "
+                "Questly could use — check the bridge version.")
+
+    mode = None
+    try:
+        req = urllib.request.Request(f"{api}/v1/about", method="GET")
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            mode = (json.loads(r.read().decode() or "{}") or {}).get("mode")
+    except Exception:                                       # noqa: BLE001
+        pass
+
+    if mode in ("normal", "native"):
+        return (f"No groups yet. In {mode} mode the bridge only learns about "
+                "groups when something calls receive — nothing has yet. Call "
+                "/v1/receive/<your number> once, or set MODE=json-rpc on the "
+                "bridge so it stays synced.")
+    return ("No groups found. If you've only just linked this number, the "
+            "bridge may not have synced yet — try again shortly.")
 
 
 def _send_gotify(cfg, title, body):
