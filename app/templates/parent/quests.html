@@ -36,6 +36,16 @@
       <span>Times each</span>
       <input name="times_per_period" type="number" min="1" max="20" value="1" inputmode="numeric">
     </label>
+    <label class="field field--full">
+      <span>Description <em>(optional)</em></span>
+      <input name="description" maxlength="240"
+             placeholder="Everything off the floor, bed made, curtains open">
+    </label>
+    <label class="field field--full">
+      <span>Steps <em>(optional, one per line &mdash; all must be ticked before it can be finished)</em></span>
+      <textarea name="subtasks" rows="3"
+                placeholder="Toys away&#10;Clothes in the basket&#10;Make the bed"></textarea>
+    </label>
     <fieldset class="field field--full">
       <span>Who's it for? <em>(nobody ticked = everyone)</em></span>
       <div class="whochips">
@@ -60,6 +70,7 @@
           {{ q.title }}
           <em class="tag">{{ (q.times_per_period or 1) ~ "× " if (q.times_per_period or 1) > 1 }}{{ q.repeat }}</em>
           {% if not q.active %}<em class="tag">paused</em>{% endif %}
+          {% if q.subtasks %}<em class="tag">{{ q.subtasks | length }} steps</em>{% endif %}
           {% if q.assigned_to %}
             <em class="tag">{{ q.assigned_to | length }} kid{{ '' if q.assigned_to|length == 1 else 's' }}</em>
           {% endif %}
@@ -94,6 +105,15 @@
           <span>Times each</span>
           <input name="times_per_period" type="number" min="1" max="20"
                  value="{{ q.times_per_period or 1 }}" inputmode="numeric">
+        </label>
+        <label class="field field--full">
+          <span>Description</span>
+          <input name="description" value="{{ q.description or '' }}" maxlength="240">
+        </label>
+        <label class="field field--full">
+          <span>Steps <em>(one per line)</em></span>
+          <textarea name="subtasks" rows="3">{% for t in q.subtasks or [] %}{{ t.text }}
+{% endfor %}</textarea>
         </label>
         <fieldset class="field field--full">
           <span>Who's it for?</span>

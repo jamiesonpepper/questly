@@ -56,10 +56,11 @@
 
   <div class="quests">
     {% for q in quests %}
-      <article class="quest quest--{{ q.state }}">
+      <article class="quest quest--{{ q.state }}" id="quest-{{ q._id }}">
         <span class="quest__emoji">{{ q.emoji }}</span>
         <div class="quest__body">
           <h3>{{ q.title }}</h3>
+          {% if q.description %}<p class="quest__desc">{{ q.description }}</p>{% endif %}
           <p class="quest__meta">
             <span class="chip chip--pts">+{{ q.points }} &#11088;</span>
             <span class="chip">{{ q.repeat }}</span>
@@ -68,7 +69,9 @@
             {% endif %}
           </p>
         </div>
-        {% if q.state == 'open' %}
+        {% if q.state == 'open' and q.steps_left %}
+          <span class="stamp stamp--steps">{{ q.steps_left }} step{{ '' if q.steps_left == 1 else 's' }} left</span>
+        {% elif q.state == 'open' %}
           <form method="post" action="{{ url_for('kid.finish_quest', quest_id=q._id) }}">
             {{ csrf_field() }}
             <button class="btn btn--go" type="submit">Done!</button>
@@ -77,6 +80,25 @@
           <span class="stamp stamp--wait">Waiting&nbsp;&#9203;</span>
         {% else %}
           <span class="stamp stamp--done">Done&nbsp;&#9989;</span>
+        {% endif %}
+        {% if q.steps_total and q.state != 'done' %}
+          <details class="steps" {{ 'open' if q.steps_left }}>
+            <summary>Steps &middot; {{ q.steps_done }} of {{ q.steps_total }}</summary>
+            <ul class="steplist">
+              {% for t in q.subtasks %}
+                <li>
+                  <form method="post"
+                        action="{{ url_for('kid.tick_step', quest_id=q._id, subtask_id=t.id) }}">
+                    {{ csrf_field() }}
+                    <button type="submit" class="step {{ 'is-done' if t.id in q.ticked }}">
+                      <span class="step__box">{{ '&#10003;' | safe if t.id in q.ticked }}</span>
+                      <span class="step__text">{{ t.text }}</span>
+                    </button>
+                  </form>
+                </li>
+              {% endfor %}
+            </ul>
+          </details>
         {% endif %}
       </article>
     {% else %}

@@ -4,12 +4,14 @@ from flask import (Blueprint, flash, g, jsonify, redirect, render_template,
 from ..db import get_db
 from ..models import (AVATARS, COLORS, PARENT_AVATARS, REPEAT_CHOICES,
                       STOCK_PERIODS, STOCK_SCOPES, adjust_points, check_password,
+                      parse_subtasks,
                       create_kid, create_parent, decide_quest_claim,
                       decide_redemption, get_quest, get_reward, get_user,
                       history_for, list_kids, list_parents, list_quests,
                       list_rewards, oid, pending_claims, pending_redemptions,
                       recent_activity, redemptions_for, set_kid_pin,
                       add_channel, get_channel, remove_channel,
+                      update_channel,
                       set_parent_password, stock_label, stock_mode,
                       update_parent)
 from ..notify import (CHANNELS, channel_summary, compose, deliver,
@@ -285,6 +287,8 @@ def create_quest():
         "repeat": repeat if repeat in REPEAT_CHOICES else "daily",
         "times_per_period": as_int(request.form.get("times_per_period"),
                                    default=1, low=1, high=20),
+        "description": request.form.get("description", "").strip()[:240],
+        "subtasks": parse_subtasks(request.form.get("subtasks", "")),
         "assigned_to": [a for a in assigned if a],
         "active": True,
     })
@@ -322,6 +326,9 @@ def update_quest(quest_id):
             "times_per_period": as_int(request.form.get("times_per_period"),
                                        default=quest.get("times_per_period", 1),
                                        low=1, high=20),
+            "description": request.form.get("description", "").strip()[:240],
+            "subtasks": parse_subtasks(request.form.get("subtasks", ""),
+                                       quest.get("subtasks")),
             "assigned_to": [a for a in assigned if a],
         }})
         flash(f"Updated '{quest['title']}'.", "success")
@@ -501,6 +508,30 @@ def add_channel_route(owner_id):
         flash(f"{spec['label']} connected — a test message is on its way.", "success")
     else:
         flash(f"Saved, but the test message failed: {detail}", "warn")
+    return _owner_redirect(owner)
+
+
+@bp.post("/channels/<owner_id>/<channel_id>/edit")
+@parent_required
+def edit_channel(owner_id, channel_id):
+    db = get_db()
+    owner = _channel_owner(db, owner_id)
+    channel = get_channel(db, owner_id, channel_id) if owner else None
+    if not channel:
+        flash("Couldn't find that channel.", "error")
+        return redirect(url_for("parent.account"))
+
+    spec = CHANNELS.get(channel["type"], {})
+    config = {}
+    for key, _label, _t, _req, _ph, _help in spec.get("fields", []):
+        config[key] = request.form.get(f"{channel['type']}__{key}", "").strip()
+
+    allowed = set(events_for(owner["role"]))
+    events = [e for e in request.form.getlist("events") if e in allowed]
+    enabled = bool(request.form.get("enabled"))
+
+    update_channel(db, owner["_id"], channel_id, config, events, enabled)
+    flash(f"Updated {owner['name']}'s {spec.get('label', 'channel')}.", "success")
     return _owner_redirect(owner)
 
 

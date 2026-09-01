@@ -42,6 +42,13 @@ def ensure_indexes(db):
     db.redemptions.create_index([("kid_id", ASCENDING), ("created_at", DESCENDING)])
     db.quests.create_index([("active", DESCENDING), ("title", ASCENDING)])
     db.quest_claims.create_index([("status", ASCENDING), ("created_at", DESCENDING)])
+    db.quest_progress.create_index(
+        [("quest_id", ASCENDING), ("kid_id", ASCENDING), ("period", ASCENDING)],
+        unique=True,
+    )
+    db.quest_progress.create_index([("updated_at", ASCENDING)],
+                                   expireAfterSeconds=90 * 24 * 60 * 60)
+
     db.notifications.create_index([("user_id", ASCENDING), ("created_at", DESCENDING)])
     db.notifications.create_index([("user_id", ASCENDING), ("read", ASCENDING)])
     # Keep the feed from growing forever; 90 days is plenty of history.

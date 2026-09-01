@@ -245,6 +245,23 @@ def add_channel(db, user_id, channel_type, config, events=None):
     return channel
 
 
+def update_channel(db, user_id, channel_id, config, events, enabled=True):
+    """Change a channel in place. Blank values keep whatever was there, so a
+    secret can stay hidden in the form and still survive an edit."""
+    existing = get_channel(db, user_id, channel_id)
+    if not existing:
+        return False
+    merged = dict(existing.get("config", {}))
+    merged.update({k: v for k, v in config.items() if v})
+    db.users.update_one(
+        {"_id": oid(user_id), "channels.id": channel_id},
+        {"$set": {"channels.$.config": merged,
+                  "channels.$.events": events or [],
+                  "channels.$.enabled": bool(enabled)}},
+    )
+    return True
+
+
 def remove_channel(db, user_id, channel_id):
     db.users.update_one({"_id": oid(user_id)},
                         {"$pull": {"channels": {"id": channel_id}}})
@@ -563,6 +580,52 @@ def get_quest(db, quest_id):
     return db.quests.find_one({"_id": _id}) if _id else None
 
 
+def parse_subtasks(raw, existing=None):
+    """Turn one-per-line text into subtask records. Ids are preserved for
+    lines that haven't changed, so ticking survives an edit to the wording of
+    a *different* step."""
+    import uuid
+    by_text = {t.get("text"): t.get("id") for t in (existing or [])}
+    out, seen = [], set()
+    for line in (raw or "").splitlines():
+        text = line.strip()[:120]
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        out.append({"id": by_text.get(text) or uuid.uuid4().hex[:8], "text": text})
+        if len(out) >= 12:
+            break
+    return out
+
+
+def quest_progress(db, quest, kid, key):
+    """Which subtasks this child has ticked for this period."""
+    doc = db.quest_progress.find_one(
+        {"quest_id": quest["_id"], "kid_id": kid["_id"], "period": key})
+    return set((doc or {}).get("done", []))
+
+
+def toggle_subtask(db, quest, kid, key, subtask_id):
+    """Tick or untick one step. Returns the resulting set of ticked ids."""
+    valid = {t["id"] for t in quest.get("subtasks", [])}
+    if subtask_id not in valid:
+        return quest_progress(db, quest, kid, key)
+
+    done = quest_progress(db, quest, kid, key)
+    op = "$pull" if subtask_id in done else "$addToSet"
+    db.quest_progress.update_one(
+        {"quest_id": quest["_id"], "kid_id": kid["_id"], "period": key},
+        {op: {"done": subtask_id}, "$set": {"updated_at": now()}},
+        upsert=True,
+    )
+    return quest_progress(db, quest, kid, key)
+
+
+def clear_progress(db, quest, kid, key):
+    db.quest_progress.delete_one(
+        {"quest_id": quest["_id"], "kid_id": kid["_id"], "period": key})
+
+
 def quest_times(quest):
     """How many times this quest can be done in one period."""
     return max(1, int(quest.get("times_per_period") or 1))
@@ -592,6 +655,12 @@ def quests_for_kid(db, kid, local_now):
         pending = sum(1 for c in claims if c["status"] == "pending")
 
         quest = dict(quest)
+        subtasks = quest.get("subtasks") or []
+        ticked = quest_progress(db, quest, kid, key) if subtasks else set()
+        quest["ticked"] = ticked
+        quest["steps_done"] = len(ticked)
+        quest["steps_total"] = len(subtasks)
+        quest["steps_left"] = max(0, len(subtasks) - len(ticked))
         quest["period"] = key
         quest["limit"] = limit
         quest["done_count"] = approved
@@ -617,6 +686,13 @@ def claim_quest(db, quest, kid, local_now):
     used = len(quest_claims_in_period(db, quest, kid, key))
     if used >= limit:
         return None, _quest_all_done(quest, limit)
+
+    subtasks = quest.get("subtasks") or []
+    if subtasks:
+        left = len(subtasks) - len(quest_progress(db, quest, kid, key))
+        if left > 0:
+            return None, (f"{left} step{'s' if left > 1 else ''} still to do "
+                          "before you can finish this one.")
 
     # Next free slot. Rejected claims keep their slot so the numbering stays
     # unique, which is what lets the index guard against a double tap.
@@ -644,6 +720,9 @@ def claim_quest(db, quest, kid, local_now):
         doc = dict(base, seq=seq + attempt)
         try:
             db.quest_claims.insert_one(doc)
+            # A repeatable quest starts its steps over for the next go.
+            if subtasks:
+                clear_progress(db, quest, kid, key)
             return doc, None
         except DuplicateKeyError:
             continue

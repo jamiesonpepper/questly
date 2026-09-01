@@ -9,6 +9,32 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [1.5.0] — 2026-08-30
+
+### Added
+
+- **Quests can have a description and a list of steps.** Steps are entered one
+  per line; a child ticks them off and can't finish the quest until they're
+  all done. Progress is tracked per child per period and resets after each
+  completion, so a repeatable quest starts fresh each go. Editing the list
+  keeps the ticks on steps whose wording didn't change.
+- **Notification channels can be edited and paused**, not just added and
+  deleted. A grown-up manages their own channels and every child's. Secrets
+  can be left blank in the edit form to keep the stored value.
+
+### Fixed
+
+- **Discord notifications returned 403.** Discord sits behind Cloudflare,
+  which rejects the default `Python-urllib` User-Agent with error 1010 before
+  the request reaches the API. Every outbound request now sends a proper
+  User-Agent.
+- **The Discord webhook URL was a masked password field**, so it couldn't be
+  checked after saving. It's now readable text, with a note that it should
+  still be treated as a secret.
+- **Long values broke the layout on a phone.** A Discord webhook URL or a
+  Signal group id would push the notifications card wider than the screen.
+  They now wrap.
+
 ## [1.4.0] — 2026-08-30
 
 ### Added
@@ -206,7 +232,8 @@ First release.
 - CSRF protection on every mutation, and route guards keeping children out of
   grown-up pages.
 
-[Unreleased]: https://github.com/mahansford/questly/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/mahansford/questly/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/mahansford/questly/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/mahansford/questly/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/mahansford/questly/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/mahansford/questly/compare/v1.2.0...v1.3.0

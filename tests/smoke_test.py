@@ -724,6 +724,130 @@ check("a once-a-day quest is still once a day", n == 1, str(n))
 
 check("the kid home page still renders", kidcli.get("/me/").status_code == 200)
 
+print("\n--- quest descriptions and steps ---")
+t = token(parent, "/parent/quests")
+parent.post("/parent/quests", data={
+    "_csrf": t, "title": "Clean the bathroom", "emoji": "\U0001f6c1", "points": "12",
+    "repeat": "daily", "times_per_period": "1",
+    "description": "Everything wiped and the floor dry",
+    "subtasks": "Wipe the sink\nClean the mirror\n\nWipe the sink\nMop the floor"},
+    follow_redirects=True)
+with app.app_context():
+    bath = get_db().quests.find_one({"title": "Clean the bathroom"})
+check("description saved", (bath or {}).get("description") == "Everything wiped and the floor dry")
+check("steps parsed, blanks and duplicates dropped",
+      len((bath or {}).get("subtasks") or []) == 3,
+      str([t_["text"] for t_ in (bath or {}).get("subtasks") or []]))
+check("each step has an id",
+      all(t_.get("id") for t_ in bath["subtasks"]))
+
+# can't finish while steps are outstanding
+tk = token(kidcli, "/me/")
+r = kidcli.post(f"/me/quests/{bath['_id']}/done", data={"_csrf": tk}, follow_redirects=True)
+with app.app_context():
+    n = get_db().quest_claims.count_documents({"quest_id": bath["_id"], "kid_id": kid["_id"]})
+check("can't finish a quest with steps outstanding", n == 0, str(n))
+check("and is told how many are left", "step" in r.get_data(as_text=True).lower())
+
+# tick them off
+for step in bath["subtasks"]:
+    tk = token(kidcli, "/me/")
+    kidcli.post(f"/me/quests/{bath['_id']}/step/{step['id']}",
+                data={"_csrf": tk}, follow_redirects=True)
+with app.app_context():
+    from app.models import quest_progress, period_key
+    from datetime import datetime
+    key = period_key("daily", datetime.now(app.config["TZINFO"]))
+    done = quest_progress(get_db(), bath, kid, key)
+check("all three steps ticked", len(done) == 3, str(len(done)))
+
+# ticking again unticks
+tk = token(kidcli, "/me/")
+kidcli.post(f"/me/quests/{bath['_id']}/step/{bath['subtasks'][0]['id']}",
+            data={"_csrf": tk}, follow_redirects=True)
+with app.app_context():
+    done = quest_progress(get_db(), bath, kid, key)
+check("tapping a ticked step unticks it", len(done) == 2, str(len(done)))
+
+tk = token(kidcli, "/me/")
+kidcli.post(f"/me/quests/{bath['_id']}/step/{bath['subtasks'][0]['id']}",
+            data={"_csrf": tk}, follow_redirects=True)
+tk = token(kidcli, "/me/")
+kidcli.post(f"/me/quests/{bath['_id']}/done", data={"_csrf": tk}, follow_redirects=True)
+with app.app_context():
+    db = get_db()
+    n = db.quest_claims.count_documents({"quest_id": bath["_id"], "kid_id": kid["_id"]})
+    done = quest_progress(db, bath, kid, key)
+check("finishing works once every step is ticked", n == 1, str(n))
+check("and the steps reset for the next go", len(done) == 0, str(len(done)))
+
+# a bogus step id is ignored rather than stored
+tk = token(kidcli, "/me/")
+kidcli.post(f"/me/quests/{bath['_id']}/step/not-a-real-step",
+            data={"_csrf": tk}, follow_redirects=True)
+with app.app_context():
+    done = quest_progress(get_db(), bath, kid, key)
+check("an unknown step id is ignored", len(done) == 0, str(len(done)))
+
+# editing keeps ids for lines that didn't change
+t = token(parent, "/parent/quests")
+parent.post(f"/parent/quests/{bath['_id']}", data={
+    "_csrf": t, "action": "save", "title": "Clean the bathroom", "emoji": "\U0001f6c1",
+    "points": "12", "repeat": "daily", "times_per_period": "1",
+    "description": "Everything wiped and the floor dry",
+    "subtasks": "Wipe the sink\nClean the mirror\nPolish the taps"},
+    follow_redirects=True)
+with app.app_context():
+    after = get_db().quests.find_one({"_id": bath["_id"]})
+before_ids = {t_["text"]: t_["id"] for t_ in bath["subtasks"]}
+after_ids = {t_["text"]: t_["id"] for t_ in after["subtasks"]}
+check("unchanged steps keep their ids",
+      after_ids["Wipe the sink"] == before_ids["Wipe the sink"])
+check("a new step gets a new id", "Polish the taps" in after_ids)
+check("a removed step is gone", "Mop the floor" not in after_ids)
+
+print("\n--- channel editing ---")
+t = token(parent, "/parent/account")
+parent.post(f"/parent/channels/{me['_id']}", data={
+    "_csrf": t, "type": "ntfy", "ntfy__topic": "first-topic",
+    "ntfy__server": "http://127.0.0.1:9"}, follow_redirects=True)
+with app.app_context():
+    ch = get_db().users.find_one({"_id": me["_id"]})["channels"][0]
+t = token(parent, "/parent/account")
+parent.post(f"/parent/channels/{me['_id']}/{ch['id']}/edit", data={
+    "_csrf": t, "ntfy__topic": "second-topic", "ntfy__server": "",
+    "events": ["approval_waiting"], "enabled": "1"}, follow_redirects=True)
+with app.app_context():
+    ch2 = get_db().users.find_one({"_id": me["_id"]})["channels"][0]
+check("editing changes what was filled in", ch2["config"]["topic"] == "second-topic")
+check("a blank field keeps the old value",
+      ch2["config"]["server"] == "http://127.0.0.1:9", ch2["config"].get("server"))
+check("event selection is saved", ch2["events"] == ["approval_waiting"], str(ch2["events"]))
+
+t = token(parent, "/parent/account")
+parent.post(f"/parent/channels/{me['_id']}/{ch['id']}/edit", data={
+    "_csrf": t, "ntfy__topic": "second-topic"}, follow_redirects=True)
+with app.app_context():
+    ch3 = get_db().users.find_one({"_id": me["_id"]})["channels"][0]
+check("a channel can be paused", ch3["enabled"] is False)
+
+# and a grown-up can edit a child's channel, but not another grown-up's
+with app.app_context():
+    kid_ch = get_db().users.find_one({"_id": kid["_id"]})["channels"][0]
+t = token(parent, "/parent/family")
+parent.post(f"/parent/channels/{kid['_id']}/{kid_ch['id']}/edit", data={
+    "_csrf": t, "signal__recipients": "group.NewGroup==", "enabled": "1"},
+    follow_redirects=True)
+with app.app_context():
+    kid_ch2 = get_db().users.find_one({"_id": kid["_id"]})["channels"][0]
+check("a grown-up can modify a child's channel",
+      kid_ch2["config"]["recipients"] == "group.NewGroup==")
+
+print("\n--- outbound requests identify themselves ---")
+from app.notify import USER_AGENT
+check("a User-Agent is set (Cloudflare 403s the default one)",
+      USER_AGENT.startswith("Questly/"), USER_AGENT)
+
 print("\n--- logout ---")
 t = token(kidcli, "/me/")
 r = kidcli.post("/logout", data={"_csrf": t}, follow_redirects=False)

@@ -19,6 +19,8 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
+from .version import __version__
+
 log = logging.getLogger(__name__)
 
 _pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="questly-notify")
@@ -53,10 +55,18 @@ def events_for(role):
 # where it can go
 # ---------------------------------------------------------------------------
 
+USER_AGENT = f"Questly/{__version__} (+https://github.com/mahansford/questly)"
+
+
 def _post(url, data, headers=None, method="POST"):
     body = data if isinstance(data, bytes) else json.dumps(data).encode()
-    req = urllib.request.Request(url, data=body, method=method,
-                                 headers=headers or {"Content-Type": "application/json"})
+    sent = {"Content-Type": "application/json"}
+    sent.update(headers or {})
+    # Discord sits behind Cloudflare, which answers the default urllib
+    # User-Agent with a 403 (error 1010) before the request ever reaches the
+    # API. Every service gets a proper one.
+    sent.setdefault("User-Agent", USER_AGENT)
+    req = urllib.request.Request(url, data=body, method=method, headers=sent)
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         return r.status
 
@@ -92,7 +102,8 @@ def signal_groups(api_url, number):
         return [], "Fill in the bridge URL and your Signal number first."
     url = f"{api}/v1/groups/{urllib.parse.quote(number)}"
     try:
-        req = urllib.request.Request(url, method="GET")
+        req = urllib.request.Request(url, method="GET",
+                                     headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
             data = json.loads(r.read().decode() or "[]")
     except urllib.error.HTTPError as exc:
@@ -127,7 +138,8 @@ def _no_groups_hint(api, raw_count):
 
     mode = None
     try:
-        req = urllib.request.Request(f"{api}/v1/about", method="GET")
+        req = urllib.request.Request(f"{api}/v1/about", method="GET",
+                                     headers={"User-Agent": USER_AGENT})
         with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
             mode = (json.loads(r.read().decode() or "{}") or {}).get("mode")
     except Exception:                                       # noqa: BLE001
@@ -211,7 +223,7 @@ CHANNELS = {
         "blurb": "Posts into a Discord channel via a webhook. Slack-style "
                  "webhooks work too if they accept a `content` field.",
         "fields": [
-            ("webhook_url", "Webhook URL", "password", True, "", "Channel settings, Integrations, Webhooks."),
+            ("webhook_url", "Webhook URL", "text", True, "", "Channel settings \u2192 Integrations \u2192 Webhooks. Treat it as a secret: anyone with it can post."),
         ],
     },
     "pushover": {

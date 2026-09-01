@@ -3,6 +3,7 @@ from flask import (Blueprint, flash, g, redirect, render_template, request,
 
 from ..db import get_db
 from ..models import (THEMES, annotate_rewards, claim_quest, get_quest,
+                      period_key, toggle_subtask,
                       get_reward, goal_for, history_for, list_rewards,
                       quests_for_kid, redeem, redemptions_for, set_kid_goal,
                       set_kid_theme, theme_for)
@@ -144,6 +145,26 @@ def choose_theme():
     else:
         flash("That's not one of the themes.", "error")
     return redirect(url_for("kid.theme"))
+
+
+@bp.post("/quests/<quest_id>/step/<subtask_id>")
+@kid_required
+def tick_step(quest_id, subtask_id):
+    """Tick or untick one step of a quest."""
+    db = get_db()
+    quest = get_quest(db, quest_id)
+    if not quest or not quest.get("active"):
+        flash("That quest has gone away.", "error")
+        return redirect(url_for("kid.home"))
+
+    assigned = quest.get("assigned_to") or []
+    if assigned and g.user["_id"] not in assigned:
+        flash("That quest isn't yours.", "error")
+        return redirect(url_for("kid.home"))
+
+    key = period_key(quest.get("repeat", "daily"), local_now())
+    toggle_subtask(db, quest, g.user, key, subtask_id)
+    return redirect(url_for("kid.home") + f"#quest-{quest['_id']}")
 
 
 @bp.get("/news")

@@ -373,7 +373,7 @@ input, select, button, textarea { font: inherit; color: inherit; }
 /* --- quests ------------------------------------------------------------- */
 .quests { display: flex; flex-direction: column; gap: 10px; }
 .quest {
-  display: flex; align-items: center; gap: 14px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   padding: 14px 16px;
   border-radius: var(--r-lg);
   background: var(--paper);
@@ -961,14 +961,33 @@ p.field--full { flex: 1 1 100%; margin: 0; }
 /* --- notification channels ---------------------------------------------- */
 .chanlist { display: flex; flex-direction: column; gap: 8px; }
 .chan {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  padding: 10px 12px;
   border-radius: var(--r-md);
   background: #faf9ff;
+  overflow: hidden;
+}
+.chan > summary {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.chan > summary::-webkit-details-marker { display: none; }
+.chan > summary:hover { background: rgba(124, 77, 255, .05); }
+.chan[open] .rowcard__chev { transform: rotate(180deg); }
+.chan.is-paused { opacity: .6; }
+.chanedit { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 12px; }
+.chan__actions {
+  display: flex; gap: 8px; flex-wrap: wrap;
+  padding: 10px 12px;
+  border-top: 1px dashed var(--line);
 }
 .chan__ico { font-size: 1.4rem; }
 .chan__text { flex: 1; min-width: 140px; display: flex; flex-direction: column; }
 .chan__text span { color: var(--ink-3); font-size: .8rem; }
+/* Webhook URLs and Signal group ids are long and unbroken; without this they
+   push the card wider than the phone screen. */
+.chan__text strong, .chan__text span, .hint { overflow-wrap: anywhere; }
+.chan__summary { min-width: 0; }
 
 .addchan { margin-top: 12px; }
 .addchan > summary {
@@ -1001,3 +1020,55 @@ p.field--full { flex: 1 1 100%; margin: 0; }
 .groupchip.is-added::after { content: " \2713"; }
 
 .chip--reps { background: rgba(124, 77, 255, .12); color: var(--grape); }
+
+/* --- quest descriptions and steps --------------------------------------- */
+.quest__desc { color: var(--ink-2); font-size: .88rem; margin-top: 2px; }
+.stamp--steps { background: rgba(255, 179, 0, .18); color: #a06f00; }
+
+.steps { width: 100%; }
+.steps > summary {
+  cursor: pointer; list-style: none;
+  padding: 8px 0 0;
+  color: var(--grape); font-weight: 800; font-size: .85rem;
+}
+.steps > summary::-webkit-details-marker { display: none; }
+.steps > summary::before { content: "\25b8  "; display: inline-block; transition: transform .15s; }
+.steps[open] > summary::before { content: "\25be  "; }
+
+.steplist { list-style: none; margin: 8px 0 4px; padding: 0; display: flex;
+            flex-direction: column; gap: 6px; }
+.step {
+  display: flex; align-items: center; gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: #f6f4ff;
+  font: inherit; text-align: left;
+  cursor: pointer;
+}
+.step:hover { background: rgba(124, 77, 255, .10); }
+.step__box {
+  flex: 0 0 24px;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  border: 2px solid rgba(36, 27, 58, .18);
+  border-radius: 8px;
+  background: #fff;
+  font-weight: 800; color: #fff;
+}
+.step__text { font-weight: 700; font-size: .92rem; }
+.step.is-done .step__box { background: var(--mint); border-color: var(--mint); }
+.step.is-done .step__text { text-decoration: line-through; color: var(--ink-3); }
+
+.field textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border: 2px solid var(--line);
+  border-radius: var(--r-md);
+  background: #fbfaff;
+  font: inherit;
+  resize: vertical;
+  min-height: 92px;
+}
+.field textarea:focus { outline: none; border-color: var(--grape); }
