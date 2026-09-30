@@ -262,4 +262,18 @@
       }
     })(started);
   }
+
+  /* ---------------------------------------------------- service worker */
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(function (err) {
+        console.warn("ServiceWorker registration failed:", err);
+      });
+    });
+  }
+
+  /* ---------------------------------------------------- install prompt */
+  window.addEventListener("beforeinstallprompt", function (e) {
+    window.deferredInstallPrompt = e;
+  });
 })();
