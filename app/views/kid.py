@@ -170,7 +170,14 @@ def tick_step(quest_id, subtask_id):
         flash("That quest isn't yours.", "error")
         return redirect(url_for("kid.home"))
 
-    key = period_key(quest.get("repeat", "daily"), local_now())
+    repeat = quest.get("repeat", "daily")
+    if repeat in ("weekday", "weekdays") and local_now().weekday() >= 5:
+        if is_ajax:
+            return jsonify({"ok": False, "error": "This quest is only available on weekdays."}), 400
+        flash("This quest is only available on weekdays.", "warn")
+        return redirect(url_for("kid.home"))
+
+    key = period_key(repeat, local_now())
     done = toggle_subtask(db, quest, g.user, key, subtask_id)
     subtasks = quest.get("subtasks") or []
     all_done = bool(subtasks and len(done) >= len(subtasks))
