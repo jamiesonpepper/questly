@@ -641,7 +641,8 @@ def quest_claims_in_period(db, quest, kid, key):
 
 def quests_for_kid(db, kid, local_now):
     """Active quests assigned to this kid, annotated with how many times
-    they've done it this period and whether another go is available."""
+    they've done it this period and whether another go is available.
+    Sorted so quests yet to be marked as done appear at the top."""
     out = []
     for quest in list_quests(db, active_only=True):
         assigned = quest.get("assigned_to") or []
@@ -673,6 +674,9 @@ def quests_for_kid(db, kid, local_now):
         else:
             quest["state"] = "done"
         out.append(quest)
+
+    state_order = {"open": 0, "pending": 1, "done": 2}
+    out.sort(key=lambda q: (state_order.get(q.get("state"), 99), (q.get("title") or "").lower()))
     return out
 
 
